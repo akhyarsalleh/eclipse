@@ -104,7 +104,7 @@ for (var i = 0; i < elements.length; i++) {
 
             if (!isException) {
                 // Formatted so dateText renders bold
-                expiredItems.push(labelText + " : <b>" + dateText + "</b>");
+                expiredItems.push(labelText + " : <b style='text-transform: uppercase'>" + dateText + "</b>");
             }
         }
     }
@@ -203,7 +203,8 @@ details.style.padding = '12px';
 details.style.backgroundColor = '#f8f9fa';
 details.style.borderRadius = '10px';
 details.innerHTML = statusConfig.detailsText; // Uses innerHTML to render <b> tags
-
+//details.style.textTransform = 'uppercase';
+    
 // 2-Line Disclaimer Element
 var disclaimer = document.createElement('div');
 disclaimer.style.marginTop = '16px';
@@ -211,7 +212,7 @@ disclaimer.style.lineHeight = '1.4';
 disclaimer.style.fontWeight = 'bold';
 disclaimer.innerHTML = `
   <div style="font-size: 12px; color: #dc2626;">REMINDER : ALWAYS RE-CHECK AND VERIFY!</div>
-  <div style="font-weight: normal; font-size: 11px; color: #64748b;">CREW CROSS-CHECKINGS ARE STILL REQUIRED</div>
+  <div style="font-weight: normal; font-size: 11px; color: #64748b;">Crew cross-checkings are still required.</div>
 `;
 
 // Dismiss Button
