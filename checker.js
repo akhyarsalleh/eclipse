@@ -1,3 +1,8 @@
+//---------------------------  //
+//  ECLIPSE LICENCE CHECKER    //
+//  Version: 0.1 / Rel: 08/26  //
+//  AUTHOR: MOHD SALLEHUDDIN ZAIDY
+
 window.runLicenseChecker = function(callback) {
 
 // 1. Remove existing overlay if shortcut is triggered multiple times
