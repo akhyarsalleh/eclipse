@@ -1,6 +1,5 @@
 # Eclipse
 Project Eclipse
-
 Digital Licence Checker
 
 Version : 0.1 (Rel 08.2026)
