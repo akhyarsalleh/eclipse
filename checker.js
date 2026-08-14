@@ -1,3 +1,5 @@
+window.runLicenseChecker = function(callback) {
+
 // 1. Remove existing overlay if shortcut is triggered multiple times
 var existingOverlay = document.getElementById('license-checker-overlay');
 if (existingOverlay) existingOverlay.remove();
@@ -236,3 +238,4 @@ if (typeof completion === 'function') {
     console.log('Expired items detected:', expiredItems);
 }
 
+}
