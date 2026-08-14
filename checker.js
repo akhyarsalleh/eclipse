@@ -210,8 +210,8 @@ disclaimer.style.marginTop = '16px';
 disclaimer.style.lineHeight = '1.4';
 disclaimer.style.fontWeight = 'bold';
 disclaimer.innerHTML = `
-  <div style="font-size: 12px; color: #dc2626;">REMINDER : ALWAYS RE-CHECK & VERIFY!</div>
-  <div style="font-weight: normal; font-size: 11px; color: #64748b;">MANUAL CROSS-CHECKINGS ARE STILL REQUIRED</div>
+  <div style="font-size: 12px; color: #dc2626;">REMINDER : ALWAYS RE-CHECK AND VERIFY!</div>
+  <div style="font-weight: normal; font-size: 11px; color: #64748b;">CREW CROSS-CHECKINGS ARE STILL REQUIRED</div>
 `;
 
 // Dismiss Button
