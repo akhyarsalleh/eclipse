@@ -1,12 +1,6 @@
 window.runLicenseChecker = function(callback) {
     // --- CONFIGURATION ---
     var WARNING_DAYS = 14; // Alert if expiring within this many days
-    
-    var IGNORE_KEYWORDS = [
-        'DATE OF BIRTH', 'TARIKH LAHIR', 'D.O.B', 'DOB',
-        'ISSUE DATE', 'DATE OF ISSUE', 'TARIKH KELUARAN',
-        'APPLICATION DATE', 'TARIKH PERMOHONAN', 'LAST RENEWAL'
-    ];
     // ---------------------
 
     var existingOverlay = document.getElementById('license-checker-overlay');
@@ -60,49 +54,35 @@ window.runLicenseChecker = function(callback) {
                 
                 var tr = el.closest('tr');
                 var card = el.closest('.card');
-                var td = el.closest('td, th');
                 
-                // --- FALSE POSITIVE FILTERING ---
-                var contextText = "";
-                if (tr) contextText = tr.textContent.toUpperCase();
-                else if (card) contextText = card.textContent.toUpperCase();
-                else contextText = (el.parentElement || el).textContent.toUpperCase();
-
-                // 1. Check against the IGNORE_KEYWORDS list
-                for (var k = 0; k < IGNORE_KEYWORDS.length; k++) {
-                    if (contextText.includes(IGNORE_KEYWORDS[k])) {
-                        isException = true;
-                        break;
-                    }
-                }
-
-                // 2. Ignore system timestamps (e.g., 14:25:00)
-                if (/\b\d{1,2}:\d{2}(:\d{2})?\b/.test(contextText)) {
-                    isException = true;
-                }
-
-                // 3. Ignore Issue Date column (Index 1 in 3-column rows, e.g., "10 AUG 2026")
-                if (tr && td) {
-                    var cellIndex = Array.prototype.indexOf.call(tr.children, td);
-                    if (cellIndex === 1 && tr.children.length >= 3) {
-                        isException = true;
-                    }
-                }
-                // --------------------------------
-
                 if (tr) {
-                    var rowNormalized = contextText.replace(/\s+/g, '');
+                    var tds = tr.querySelectorAll('td');
+                    
+                    // --- STRUCTURAL FILTERING FOR ROWS ---
+                    // If the row has multiple columns (like Issue Date vs Expiry Date layout)
+                    if (tds.length >= 3) {
+                        var targetTd = el.closest('td');
+                        var colIndex = Array.prototype.indexOf.call(tds, targetTd);
+                        
+                        // Rule: If it's in Column 1 (index 1, which is the Issue Date column) 
+                        // and it's NOT red, it's a past issue date. Ignore it completely.
+                        if (colIndex === 1 && !isRed) {
+                            isException = true;
+                        }
+                    }
+
+                    var rowNormalized = tr.textContent.toUpperCase().replace(/\s+/g, '');
                     if (rowNormalized.includes('CLASS1(SC)') || rowNormalized.includes('CLASS1SC')) {
                         isException = true;
                     } else if (!isException) {
-                        var labelTd = tr.querySelector('.text-left') || tr.querySelector('td');
+                        var labelTd = tr.querySelector('.text-left') || tds[0];
                         if (labelTd) labelText = labelTd.textContent.replace('•', '').trim();
                     }
                 } else if (card) {
-                    var cardNormalized = contextText.replace(/\s+/g, '');
+                    var cardNormalized = card.textContent.toUpperCase().replace(/\s+/g, '');
                     if (cardNormalized.includes('CLASS1(SC)')) {
                         isException = true;
-                    } else if (!isException) {
+                    } else {
                         var titleEl = card.querySelector('.col-sm-12 .bg-gray-300') || 
                                       card.querySelector('div[style*="font-weight: 500"]') || 
                                       card.querySelector('.fs-5');
@@ -126,8 +106,8 @@ window.runLicenseChecker = function(callback) {
                         status = "EXPIRED";
                     } 
                     
-                    // Mathematical Date Evaluation
-                    if (isDate) {
+                    // Mathematical Date Evaluation (Only evaluate if it's explicitly styled red or a valid expiry column date)
+                    if (isDate && (isRed || status === "EXPIRED" || (tr && Array.prototype.indexOf.call(tr.querySelectorAll('td'), el.closest('td')) >= 2))) {
                         var d = new Date(dateMatch[0]);
                         var now = new Date();
                         now.setHours(0,0,0,0); // Reset time to midnight for accurate day calc
@@ -180,7 +160,6 @@ window.runLicenseChecker = function(callback) {
 
     var statusConfig = {};
     
-    // Determine the active UI State
     if (expiredItems.length > 0) {
         var comboList = expiredItems.slice();
         if (warningItems.length > 0) {
@@ -199,10 +178,10 @@ window.runLicenseChecker = function(callback) {
         };
     } else if (warningItems.length > 0) {
         statusConfig = {
-            overlayBg: 'rgba(245, 158, 11, 0.35)', // Amber transparent
-            badgeBg: '#f59e0b', // Amber solid
+            overlayBg: 'rgba(245, 158, 11, 0.35)',
+            badgeBg: '#f59e0b',
             icon: '⚠️',
-            titleColor: '#b45309', // Dark Amber text
+            titleColor: '#b45309',
             titleText: 'Action Required Soon',
             tagBg: '#f59e0b',
             tagText: 'EXPIRING IN ≤ ' + WARNING_DAYS + ' DAYS',
@@ -248,6 +227,7 @@ window.runLicenseChecker = function(callback) {
     button.style.cssText = 'margin-top:14px;padding:12px 28px;font-size:16px;font-weight:600;border:none;border-radius:10px;background-color:#007aff;color:#ffffff;';
     button.onclick = closeOverlay;
 
+    alertBox.expiryContainer = headerContainer; // Clean tracking
     alertBox.appendChild(headerContainer);
     alertBox.appendChild(details);
     alertBox.appendChild(disclaimer);
