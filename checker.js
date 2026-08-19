@@ -2,28 +2,17 @@ window.runLicenseChecker = function(callback) {
     // --- CONFIGURATION & EXCEPTION LISTS ---
     var WARNING_DAYS = 14; // Alert if expiring within this many days
 
-    // 1. Ignore specific qualification labels, static fields, and bilingual terms
+    // Keywords that indicate static/non-expiring fields
     var IGNORED_KEYWORDS = [
-        'CLASS1(SC)',
-        'CLASS1SC',
-        'CPL(A)',
-        'ATPL(A)',
-        'DATE OF ISSUE',
-        'ISSUE DATE',
-        'TARIKH DIKELUARKAN',
-        'TARIKH ISU',
-        'DATE OF BIRTH',
-        'TARIKH LAHIR',
-        'BIRTH',
-        'EXAM DATE',
-        'DATE OF EXAMINATION',
-        'TARIKH PEPERIKSAAN',
-        'APPLICATION DATE',
-        'TARIKH PERMOHONAN',
-        'LAST RENEWAL'
+        'CLASS1(SC)', 'CLASS1SC', 'CLASS 1',
+        'CPL(A)', 'ATPL(A)', 'PPL(A)', 'CPL', 'ATPL',
+        'DATE OF ISSUE', 'ISSUE DATE', 'TARIKH DIKELUARKAN', 'TARIKH ISU',
+        'DATE OF BIRTH', 'TARIKH LAHIR', 'BIRTH', 'LAHIR', 'D.O.B', 'DOB',
+        'EXAM DATE', 'DATE OF EXAMINATION', 'TARIKH PEPERIKSAAN',
+        'APPLICATION DATE', 'TARIKH PERMOHONAN',
+        'LAST RENEWAL', 'NATIONALITY', 'WARGANEGARA', 'GENDER', 'JANTINA'
     ];
 
-    // 2. Ignore exact static date strings if needed
     var IGNORED_DATES = [
         '01 Jan 1900',
         '00/00/0000'
@@ -59,6 +48,75 @@ window.runLicenseChecker = function(callback) {
         return false;
     }
 
+    // Traverses up and backwards through DOM nodes to capture surrounding text context
+    function getNearbyContext(el) {
+        var contextText = el.textContent;
+        
+        var tr = el.closest('tr');
+        if (tr) {
+            contextText += " " + tr.textContent;
+            var prev = tr.previousElementSibling;
+            var depth = 0;
+            while (prev && depth < 3) {
+                contextText += " " + prev.textContent;
+                prev = prev.previousElementSibling;
+                depth++;
+            }
+        }
+
+        var card = el.closest('.card');
+        if (card) {
+            contextText += " " + card.textContent;
+        }
+
+        var parent = el.parentElement;
+        var pDepth = 0;
+        while (parent && parent !== document.body && pDepth < 4) {
+            if (parent.previousElementSibling) {
+                contextText += " " + parent.previousElementSibling.textContent;
+            }
+            parent = parent.parentElement;
+            pDepth++;
+        }
+
+        return contextText.toUpperCase().replace(/\s+/g, ' ');
+    }
+
+    function findLabelText(el) {
+        var tr = el.closest('tr');
+        if (tr) {
+            var tds = tr.querySelectorAll('td');
+            for (var i = 0; i < tds.length; i++) {
+                var txt = tds[i].textContent.trim();
+                if (txt.length > 0 && !tds[i].contains(el)) {
+                    return txt.replace('•', '').trim();
+                }
+            }
+            var prev = tr.previousElementSibling;
+            var depth = 0;
+            while (prev && depth < 3) {
+                var prevTds = prev.querySelectorAll('td');
+                for (var j = 0; j < prevTds.length; j++) {
+                    var pTxt = prevTds[j].textContent.trim();
+                    if (pTxt.length > 0) {
+                        return pTxt.replace('•', '').trim();
+                    }
+                }
+                prev = prev.previousElementSibling;
+                depth++;
+            }
+        }
+        
+        var card = el.closest('.card');
+        if (card) {
+            var titleEl = card.querySelector('.col-sm-12 .bg-gray-300') || 
+                          card.querySelector('div[style*="font-weight: 500"]') || 
+                          card.querySelector('.fs-5');
+            if (titleEl) return titleEl.textContent.trim();
+        }
+        return "Qualification";
+    }
+
     var elements = document.querySelectorAll('b, span, td, div, p, font, strong');
     var expiredItemsMap = {};
     var warningItemsMap = {};
@@ -70,79 +128,41 @@ window.runLicenseChecker = function(callback) {
             var text = el.textContent.trim();
             var isRed = isRedOrExpired(el);
             
-            // Regex to find date formats like "13 Mar 1997" or "10 AUG 2026"
             var dateMatch = text.match(/\b\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}\b/i);
             var isDate = !!dateMatch;
             
             if (isRed || isDate || text.toUpperCase() === 'EXPIRED') {
                 var dateText = isDate ? dateMatch[0] : text;
-                var labelText = "";
                 var isException = false;
                 
-                var tr = el.closest('tr');
-                var card = el.closest('.card');
-                
-                if (tr) {
-                    var labelTd = tr.querySelector('.text-left') || tr.querySelector('td');
-                    if (labelTd && labelTd.textContent.trim().length > 0) {
-                        labelText = labelTd.textContent.replace('•', '').trim();
-                    } else if (tr.previousElementSibling) {
-                        // Look at previous row if current row has an empty first column
-                        var prevTd = tr.previousElementSibling.querySelector('.pl-4') || tr.previousElementSibling.querySelector('td');
-                        if (prevTd) labelText = prevTd.textContent.replace('•', '').trim();
-                    }
-                } else if (card) {
-                    var titleEl = card.querySelector('.col-sm-12 .bg-gray-300') || 
-                                  card.querySelector('div[style*="font-weight: 500"]') || 
-                                  card.querySelector('.fs-5');
-                    if (titleEl) labelText = titleEl.textContent.trim();
+                var surroundingContext = getNearbyContext(el);
 
-                    if (!isDate && text.toUpperCase() !== 'EXPIRED') {
-                         var dateEl = card.querySelector('.text-uppercase b') || card.querySelector('.fs-4 b, .fs-3 b');
-                         if (dateEl) dateText = dateEl.textContent.trim();
-                    }
-                }
-
-                if (!labelText) labelText = "Qualification";
-                labelText = labelText.replace(/\s+/g, ' ');
-
-                // --- EXCEPTION CHECKS ---
-                
-                // 1. Multi-row inspection: inspect current row AND previous row text
-                var fullRowText = tr ? tr.textContent.toUpperCase() : '';
-                var prevRowText = (tr && tr.previousElementSibling) ? tr.previousElementSibling.textContent.toUpperCase() : '';
-                var fullCardText = card ? card.textContent.toUpperCase() : '';
-                var upperLabel = labelText.toUpperCase();
-
-                // Combine all surrounding context
-                var combinedContext = upperLabel + " " + fullRowText + " " + prevRowText + " " + fullCardText;
-
+                // Check exception keywords against full surrounding context
                 for (var k = 0; k < IGNORED_KEYWORDS.length; k++) {
-                    var kw = IGNORED_KEYWORDS[k];
-                    if (combinedContext.includes(kw)) {
+                    if (surroundingContext.includes(IGNORED_KEYWORDS[k])) {
                         isException = true;
                         break;
                     }
                 }
 
-                // 2. Ignore timestamps containing time components (e.g. "22:34:34")
+                // Ignore timestamp strings (e.g., "22:34:34")
                 if (/\b\d{1,2}:\d{2}(:\d{2})?\b/.test(text)) {
                     isException = true;
                 }
 
-                // 3. Ignore signature blocks (.ceosignature)
-                if (document.querySelector('.ceosignature') && (el.closest('.ceosignature') || (tr && tr.querySelector('.ceosignature')))) {
+                // Ignore CEO signature block
+                if (document.querySelector('.ceosignature') && (el.closest('.ceosignature') || (el.closest('tr') && el.closest('tr').querySelector('.ceosignature')))) {
                     isException = true;
                 }
 
-                // 4. Ignore explicit static date strings
+                // Ignore static dates
                 if (IGNORED_DATES.indexOf(dateText) !== -1) {
                     isException = true;
                 }
 
-                // --- END EXCEPTION CHECKS ---
-
                 if (!isException) {
+                    var labelText = findLabelText(el);
+                    labelText = labelText.replace(/\s+/g, ' ');
                     var status = "VALID";
                     
                     if (isRed || text.toUpperCase() === 'EXPIRED') {
