@@ -15,7 +15,7 @@ window.runLicenseChecker = function(callback) {
     ];
 
     var IGNORED_DATES = [
-        '01 JAN 1900',
+        '01 Jan 1900',
         '00/00/0000'
     ];
     // ---------------------------------------
@@ -23,21 +23,20 @@ window.runLicenseChecker = function(callback) {
     var existingOverlay = document.getElementById('license-checker-overlay');
     if (existingOverlay) existingOverlay.remove();
 
-    // Reliable cross-browser date parsing for "DD MMM YYYY"
+    // Custom parser to prevent Safari/WebKit "Invalid Date" bugs
     function parseCustomDate(dateStr) {
-        if (!dateStr) return null;
-        var months = { JAN:0, FEB:1, MAR:2, APR:3, MAY:4, JUN:5, JUL:6, AUG:7, SEP:8, OCT:9, NOV:10, DEC:11 };
-        var match = dateStr.match(/(\d{1,2})\s+([A-Za-z]{3})[a-z]*\s+(\d{4})/i);
-        if (match) {
-            var day = parseInt(match[1], 10);
-            var mon = months[match[2].toUpperCase()];
-            var yr = parseInt(match[3], 10);
-            if (mon !== undefined) {
-                return new Date(yr, mon, day);
-            }
-        }
-        var fallback = new Date(dateStr);
-        return isNaN(fallback.getTime()) ? null : fallback;
+        var m = dateStr.match(/(\d{1,2})\s+([A-Za-z]{3,})\s+(\d{4})/);
+        if (!m) return null;
+        var day = parseInt(m[1], 10);
+        var monthStr = m[2].substring(0, 3).toUpperCase();
+        var year = parseInt(m[3], 10);
+        
+        var months = {
+            'JAN':0, 'FEB':1, 'MAR':2, 'APR':3, 'MAY':4, 'JUN':5,
+            'JUL':6, 'AUG':7, 'SEP':8, 'OCT':9, 'NOV':10, 'DEC':11
+        };
+        if (months[monthStr] === undefined) return null;
+        return new Date(year, months[monthStr], day);
     }
 
     function isRedOrExpired(el) {
@@ -83,21 +82,6 @@ window.runLicenseChecker = function(callback) {
         return '';
     }
 
-    function getImmediateLabel(el) {
-        var label = getColumnHeader(el);
-        
-        var td = el.closest('td, th');
-        if (td && td.previousElementSibling) {
-            label += " " + td.previousElementSibling.textContent;
-        }
-        
-        if (el.previousElementSibling) {
-            label += " " + el.previousElementSibling.textContent;
-        }
-        
-        return label.toUpperCase().replace(/\s+/g, ' ');
-    }
-
     function getRowLeadLabel(el) {
         var td = el.closest('td, th');
         if (!td) return '';
@@ -110,6 +94,12 @@ window.runLicenseChecker = function(callback) {
             if (txt.length > 0) return txt;
         }
         return '';
+    }
+
+    function getImmediateCellContext(el) {
+        var td = el.closest('td, th');
+        if (td) return td.textContent.toUpperCase();
+        return el.textContent.toUpperCase();
     }
 
     function findLabelText(el) {
@@ -137,13 +127,21 @@ window.runLicenseChecker = function(callback) {
         return "Qualification";
     }
 
+    // Ignores structural line-breaks when assessing if an element is a text container
+    function isLeafElement(el) {
+        var childElements = Array.prototype.slice.call(el.children).filter(function(child) {
+            return child.tagName !== 'BR' && child.tagName !== 'HR';
+        });
+        return childElements.length === 0;
+    }
+
     var elements = document.querySelectorAll('b, span, td, div, p, font, strong');
     var expiredItemsMap = {};
     var warningItemsMap = {};
 
     for (var i = 0; i < elements.length; i++) {
         var el = elements[i];
-        if (el.children.length === 0 && el.textContent.trim().length > 0) {
+        if (isLeafElement(el) && el.textContent.trim().length > 0) {
             
             var text = el.textContent.trim();
             var isRed = isRedOrExpired(el);
@@ -156,9 +154,9 @@ window.runLicenseChecker = function(callback) {
                 var isException = false;
                 
                 var colHeader = getColumnHeader(el);
-                var immediateLabel = getImmediateLabel(el);
+                var immediateContext = getImmediateCellContext(el);
 
-                // 1. Column Header check: Ignore if under Issue Date header
+                // 1. Column Header check: Ignore if specifically under an Issue Date header
                 for (var h = 0; h < ISSUE_DATE_KEYWORDS.length; h++) {
                     if (colHeader.includes(ISSUE_DATE_KEYWORDS[h])) {
                         isException = true;
@@ -166,17 +164,18 @@ window.runLicenseChecker = function(callback) {
                     }
                 }
 
-                // 2. Immediate Label check: Ignore static fields (DOB, etc.)
+                // 2. Field keyword check: Scope strictly to current column header or immediate cell text
                 if (!isException) {
                     for (var k = 0; k < IGNORED_FIELD_KEYWORDS.length; k++) {
-                        if (immediateLabel.includes(IGNORED_FIELD_KEYWORDS[k])) {
+                        var kw = IGNORED_FIELD_KEYWORDS[k];
+                        if (colHeader.includes(kw) || immediateContext.includes(kw)) {
                             isException = true;
                             break;
                         }
                     }
                 }
 
-                // 3. Ignore timestamps
+                // 3. Ignore timestamp strings (e.g., "22:34:34")
                 if (/\b\d{1,2}:\d{2}(:\d{2})?\b/.test(text)) {
                     isException = true;
                 }
@@ -186,8 +185,8 @@ window.runLicenseChecker = function(callback) {
                     isException = true;
                 }
 
-                // 5. Ignore static placeholder dates
-                if (IGNORED_DATES.indexOf(dateText.toUpperCase()) !== -1) {
+                // 5. Ignore static date values
+                if (IGNORED_DATES.indexOf(dateText) !== -1) {
                     isException = true;
                 }
 
@@ -205,9 +204,8 @@ window.runLicenseChecker = function(callback) {
                         if (d) {
                             var now = new Date();
                             now.setHours(0,0,0,0);
-                            d.setHours(0,0,0,0);
                             
-                            var diffDays = Math.round((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                            var diffDays = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
                             
                             if (diffDays < 0) {
                                 status = "EXPIRED";
@@ -215,11 +213,9 @@ window.runLicenseChecker = function(callback) {
                                 if (status !== "EXPIRED") {
                                     status = "WARNING";
                                 }
-                            }
-
-                            if (status === "WARNING") {
                                 var dayString = diffDays === 1 ? 'day' : 'days';
-                                dateText = dateMatch[0] + " <span style='color:#b45309; font-size: 0.85em; font-weight: bold;'>(" + diffDays + " " + dayString + " left)</span>";
+                                var dayStyle = status === "EXPIRED" ? "color:#dc2626;" : "color:#b45309;";
+                                dateText = dateMatch[0] + " <span style='" + dayStyle + " font-size: 0.85em; font-weight: bold;'>(" + diffDays + " " + dayString + " left)</span>";
                             }
                         }
                     }
@@ -269,7 +265,7 @@ window.runLicenseChecker = function(callback) {
             titleColor: '#d32f2f',
             titleText: 'Qualification Expired / Invalid',
             tagBg: '#ef4444',
-            tagText: 'DO NOT FLY!',
+            tagText: 'EXPIRED QUALIFICATION DETECTED',
             detailsText: comboList.join('\n\n')
         };
     } else if (warningItems.length > 0) {
@@ -291,7 +287,7 @@ window.runLicenseChecker = function(callback) {
             titleColor: '#2e7d32',
             titleText: 'All Qualifications Valid',
             tagBg: '#22c55e',
-            tagText: 'HAVE A SAFE FLIGHT!',
+            tagText: 'ALL CLEAR',
             detailsText: 'All checked licence qualifications are valid.'
         };
     }
