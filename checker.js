@@ -23,124 +23,109 @@ window.runLicenseChecker = function(callback) {
             var r = parseInt(matchColor[1], 10), g = parseInt(matchColor[2], 10), b = parseInt(matchColor[3], 10);
             if (r > 180 && r > g + 50 && r > b + 50) return true;
         }
-
-        var matchBg = style.backgroundColor.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-        if (matchBg) {
-            var s = parseInt(matchBg[1], 10), u = parseInt(matchBg[2], 10), p = parseInt(matchBg[3], 10);
-            if (s > 180 && s > u + 50 && s > p + 50) return true;
-        }
         return false;
     }
 
-    var elements = document.querySelectorAll('b, span, td, div, p, font, strong');
     var expiredItemsMap = {};
     var warningItemsMap = {};
 
-    for (var i = 0; i < elements.length; i++) {
-        var el = elements[i];
-        if (el.children.length === 0 && el.textContent.trim().length > 0) {
-            
-            var text = el.textContent.trim();
-            var tr = el.closest('tr');
-            
-            // --- BULLETPROOF ROW-LEVEL LEGAL DISCLAIMER EXCLUSION ---
-            // If the element or its parent row contains legal text or 1944, skip it entirely
-            var rowText = tr ? tr.textContent.toUpperCase() : "";
-            if (text.includes('1944') || 
-                rowText.includes('CIVIL AVIATION ACT') || 
-                rowText.includes('CONVENTION') || 
-                rowText.includes('ANNEX 1') || 
-                rowText.includes('1944')) {
-                continue;
+    // --- TARGET TABLE ROWS DIRECTLY (Bypasses random DOM crawling) ---
+    var rows = document.querySelectorAll('tr');
+
+    for (var r = 0; r < rows.length; r++) {
+        var tr = rows[r];
+        var rowUpper = tr.textContent.toUpperCase();
+
+        // --- BULLETPROOF DISCLAIMER / FOOTER ROW EXCLUSION ---
+        if (rowUpper.includes('CIVIL AVIATION') || 
+            rowUpper.includes('ANNEX 1') || 
+            rowUpper.includes('CONVENTION') || 
+            rowUpper.includes('1944') || 
+            rowUpper.includes('1969') || 
+            rowUpper.includes('CLASS1(SC)') ||
+            rowUpper.includes('CLASS1SC')) {
+            continue;
+        }
+
+        var tds = tr.querySelectorAll('td');
+        if (tds.length === 0) continue;
+
+        // Get qualification label from the first column or designated label cell
+        var labelTd = tr.querySelector('.text-left') || tds[0];
+        var labelText = labelTd ? labelTd.textContent.replace('•', '').trim() : "Qualification";
+        labelText = labelText.replace(/\s+/g, ' ');
+
+        // Skip if label is a Roman numeral footnote (e.g. "VIII", "IX")
+        if (/^[IVXLCDM]+\.?$/i.test(labelText)) {
+            continue;
+        }
+
+        // Iterate through cells in this qualification row
+        for (var c = 0; c < tds.length; c++) {
+            var td = tds[c];
+            // If it's column index 1 (issue date column) and NOT red, ignore it completely
+            var isIssueCol = (c === 1 && tds.length >= 3);
+
+            var dateElements = td.querySelectorAll('b, span, strong, font');
+            if (dateElements.length === 0) {
+                dateElements = [td];
             }
-            
-            var isRed = isRedOrExpired(el);
-            
-            // --- BILINGUAL DATE REGEX (English & Bahasa Melayu months) ---
-            var dateMatch = text.match(/\b\d{1,2}\s+(Jan|Feb|Mar|Mac|Apr|May|Mei|Jun|Jul|Aug|Ogos|Sep|Oct|Okt|Nov|Dec|Dis)[a-z]*\s+\d{4}\b/i);
-            var isDate = !!dateMatch;
-            
-            if (isRed || isDate || text.toUpperCase() === 'EXPIRED') {
-                var dateText = isDate ? dateMatch[0] : text;
-                var labelText = "";
-                var isException = false;
-                
-                var card = el.closest('.card');
-                
-                if (tr) {
-                    var tds = tr.querySelectorAll('td');
-                    
-                    // --- COLUMN 1 (ISSUE DATE) EXCLUSION ---
-                    if (tds.length >= 3) {
-                        var targetTd = el.closest('td');
-                        var colIndex = Array.prototype.indexOf.call(tds, targetTd);
-                        
-                        if (colIndex === 1 && !isRed) {
-                            isException = true;
-                        }
-                    }
 
-                    var rowNormalized = rowText.replace(/\s+/g, '');
-                    if (rowNormalized.includes('CLASS1(SC)') || rowNormalized.includes('CLASS1SC')) {
-                        isException = true;
-                    } else if (!isException) {
-                        var labelTd = tr.querySelector('.text-left') || tds[0];
-                        if (labelTd) labelText = labelTd.textContent.replace('•', '').trim();
-                    }
-                } else if (card) {
-                    var cardNormalized = card.textContent.toUpperCase().replace(/\s+/g, '');
-                    if (cardNormalized.includes('CLASS1(SC)')) {
-                        isException = true;
-                    } else {
-                        var titleEl = card.querySelector('.col-sm-12 .bg-gray-300') || 
-                                      card.querySelector('div[style*="font-weight: 500"]') || 
-                                      card.querySelector('.fs-5');
-                        if (titleEl) labelText = titleEl.textContent.trim();
+            for (var d = 0; d < dateElements.length; d++) {
+                var el = dateElements[d];
+                var text = el.textContent.trim();
+                var isRed = isRedOrExpired(el);
 
-                        if (!isDate && text.toUpperCase() !== 'EXPIRED') {
-                             var dateEl = card.querySelector('.text-uppercase b') || card.querySelector('.fs-4 b, .fs-3 b');
-                             if (dateEl) dateText = dateEl.textContent.trim();
-                        }
-                    }
+                if (isIssueCol && !isRed) {
+                    continue; // Skip past issue date
                 }
 
-                if (!labelText) labelText = "Qualification";
-                labelText = labelText.replace(/\s+/g, ' ');
+                // Bilingual date regex (supports English and Bahasa Melayu months)
+                var dateMatch = text.match(/\b\d{1,2}\s+(Jan|Feb|Mar|Mac|Apr|May|Mei|Jun|Jul|Aug|Ogos|Sep|Oct|Okt|Nov|Dec|Dis)[a-z]*\s+\d{4}\b/i);
+                var isDate = !!dateMatch;
 
-                if (isException) continue;
+                if (isDate || isRed || text.toUpperCase() === 'EXPIRED') {
+                    var dateText = isDate ? dateMatch[0] : text;
+                    var status = "VALID";
 
-                var status = "VALID";
-                
-                if (isRed || text.toUpperCase() === 'EXPIRED') {
-                    status = "EXPIRED";
-                } 
-                
-                // Mathematical Date Evaluation
-                if (isDate) {
-                    var d = new Date(dateMatch[0]);
-                    var now = new Date();
-                    now.setHours(0,0,0,0);
-                    
-                    var diffDays = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-                    
-                    if (diffDays < 0) {
+                    if (isRed || text.toUpperCase() === 'EXPIRED') {
                         status = "EXPIRED";
-                    } else if (diffDays <= WARNING_DAYS) {
-                        if (status !== "EXPIRED") {
-                            status = "WARNING";
-                        }
-                        var dayString = diffDays === 1 ? 'day' : 'days';
-                        var dayStyle = status === "EXPIRED" ? "color:#dc2626;" : "color:#b45309;";
-                        dateText = dateMatch[0] + " <span style='" + dayStyle + " font-size: 0.85em; font-weight: bold;'>(" + diffDays + " " + dayString + " left)</span>";
                     }
-                }
 
-                if (status === "EXPIRED") {
-                    expiredItemsMap[labelText] = labelText + " : <b>" + dateText + "</b>";
-                    delete warningItemsMap[labelText];
-                } else if (status === "WARNING") {
-                    if (!expiredItemsMap[labelText]) {
-                        warningItemsMap[labelText] = labelText + " : <b>" + dateText + "</b>";
+                    if (isDate) {
+                        // Normalize Malay month names for reliable JS Date parsing
+                        var normalizedDateStr = dateMatch[0]
+                            .replace(/Mac/gi, 'Mar')
+                            .replace(/Mei/gi, 'May')
+                            .replace(/Ogos/gi, 'Aug')
+                            .replace(/Okt/gi, 'Oct')
+                            .replace(/Dis/gi, 'Dec');
+
+                        var dt = new Date(normalizedDateStr);
+                        var now = new Date();
+                        now.setHours(0,0,0,0);
+
+                        var diffDays = Math.ceil((dt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+                        if (diffDays < 0) {
+                            status = "EXPIRED";
+                        } else if (diffDays <= WARNING_DAYS) {
+                            if (status !== "EXPIRED") {
+                                status = "WARNING";
+                            }
+                            var dayString = diffDays === 1 ? 'day' : 'days';
+                            var dayStyle = status === "EXPIRED" ? "color:#dc2626;" : "color:#b45309;";
+                            dateText = dateMatch[0] + " <span style='" + dayStyle + " font-size: 0.85em; font-weight: bold;'>(" + diffDays + " " + dayString + " left)</span>";
+                        }
+                    }
+
+                    if (status === "EXPIRED") {
+                        expiredItemsMap[labelText] = labelText + " : <b>" + dateText + "</b>";
+                        delete warningItemsMap[labelText];
+                    } else if (status === "WARNING") {
+                        if (!expiredItemsMap[labelText]) {
+                            warningItemsMap[labelText] = labelText + " : <b>" + dateText + "</b>";
+                        }
                     }
                 }
             }
