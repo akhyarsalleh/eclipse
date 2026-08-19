@@ -58,14 +58,12 @@ window.runLicenseChecker = function(callback) {
                 if (tr) {
                     var tds = tr.querySelectorAll('td');
                     
-                    // --- STRUCTURAL FILTERING FOR ROWS ---
-                    // If the row has multiple columns (like Issue Date vs Expiry Date layout)
+                    // --- STRICT COLUMN 1 (ISSUE DATE) EXCLUSION ---
                     if (tds.length >= 3) {
                         var targetTd = el.closest('td');
                         var colIndex = Array.prototype.indexOf.call(tds, targetTd);
                         
-                        // Rule: If it's in Column 1 (index 1, which is the Issue Date column) 
-                        // and it's NOT red, it's a past issue date. Ignore it completely.
+                        // If it's in the 2nd column (index 1 / Issue Date) and NOT explicitly red, ignore it entirely
                         if (colIndex === 1 && !isRed) {
                             isException = true;
                         }
@@ -98,42 +96,43 @@ window.runLicenseChecker = function(callback) {
                 if (!labelText) labelText = "Qualification";
                 labelText = labelText.replace(/\s+/g, ' ');
 
-                if (!isException) {
-                    var status = "VALID";
-                    
-                    // Fallback to EXPIRED if portal styled it red manually
-                    if (isRed || text.toUpperCase() === 'EXPIRED') {
-                        status = "EXPIRED";
-                    } 
-                    
-                    // Mathematical Date Evaluation (Only evaluate if it's explicitly styled red or a valid expiry column date)
-                    if (isDate && (isRed || status === "EXPIRED" || (tr && Array.prototype.indexOf.call(tr.querySelectorAll('td'), el.closest('td')) >= 2))) {
-                        var d = new Date(dateMatch[0]);
-                        var now = new Date();
-                        now.setHours(0,0,0,0); // Reset time to midnight for accurate day calc
-                        
-                        var diffDays = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-                        
-                        if (diffDays < 0) {
-                            status = "EXPIRED";
-                        } else if (diffDays <= WARNING_DAYS) {
-                            if (status !== "EXPIRED") {
-                                status = "WARNING";
-                            }
-                            var dayString = diffDays === 1 ? 'day' : 'days';
-                            var dayStyle = status === "EXPIRED" ? "color:#dc2626;" : "color:#b45309;";
-                            dateText = dateMatch[0] + " <span style='" + dayStyle + " font-size: 0.85em; font-weight: bold;'>(" + diffDays + " " + dayString + " left)</span>";
-                        }
-                    }
+                // If flagged as an exception by column rule or class filter, skip processing
+                if (isException) continue;
 
-                    // Route to correct map (prevents duplicates)
-                    if (status === "EXPIRED") {
-                        expiredItemsMap[labelText] = labelText + " : <b>" + dateText + "</b>";
-                        delete warningItemsMap[labelText]; // Priority override if duplicate found
-                    } else if (status === "WARNING") {
-                        if (!expiredItemsMap[labelText]) {
-                            warningItemsMap[labelText] = labelText + " : <b>" + dateText + "</b>";
+                var status = "VALID";
+                
+                // Fallback to EXPIRED if portal styled it red manually
+                if (isRed || text.toUpperCase() === 'EXPIRED') {
+                    status = "EXPIRED";
+                } 
+                
+                // Mathematical Date Evaluation
+                if (isDate) {
+                    var d = new Date(dateMatch[0]);
+                    var now = new Date();
+                    now.setHours(0,0,0,0); // Reset time to midnight for accurate day calc
+                    
+                    var diffDays = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                    
+                    if (diffDays < 0) {
+                        status = "EXPIRED";
+                    } else if (diffDays <= WARNING_DAYS) {
+                        if (status !== "EXPIRED") {
+                            status = "WARNING";
                         }
+                        var dayString = diffDays === 1 ? 'day' : 'days';
+                        var dayStyle = status === "EXPIRED" ? "color:#dc2626;" : "color:#b45309;";
+                        dateText = dateMatch[0] + " <span style='" + dayStyle + " font-size: 0.85em; font-weight: bold;'>(" + diffDays + " " + dayString + " left)</span>";
+                    }
+                }
+
+                // Route to correct map (prevents duplicates)
+                if (status === "EXPIRED") {
+                    expiredItemsMap[labelText] = labelText + " : <b>" + dateText + "</b>";
+                    delete warningItemsMap[labelText]; // Priority override if duplicate found
+                } else if (status === "WARNING") {
+                    if (!expiredItemsMap[labelText]) {
+                        warningItemsMap[labelText] = labelText + " : <b>" + dateText + "</b>";
                     }
                 }
             }
@@ -227,7 +226,6 @@ window.runLicenseChecker = function(callback) {
     button.style.cssText = 'margin-top:14px;padding:12px 28px;font-size:16px;font-weight:600;border:none;border-radius:10px;background-color:#007aff;color:#ffffff;';
     button.onclick = closeOverlay;
 
-    alertBox.expiryContainer = headerContainer; // Clean tracking
     alertBox.appendChild(headerContainer);
     alertBox.appendChild(details);
     alertBox.appendChild(disclaimer);
