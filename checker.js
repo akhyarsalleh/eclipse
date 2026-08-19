@@ -23,90 +23,82 @@ window.runLicenseChecker = function(callback) {
             var r = parseInt(matchColor[1], 10), g = parseInt(matchColor[2], 10), b = parseInt(matchColor[3], 10);
             if (r > 180 && r > g + 50 && r > b + 50) return true;
         }
+
+        var matchBg = style.backgroundColor.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+        if (matchBg) {
+            var s = parseInt(matchBg[1], 10), u = parseInt(matchBg[2], 10), p = parseInt(matchBg[3], 10);
+            if (s > 180 && s > u + 50 && s > p + 50) return true;
+        }
         return false;
     }
 
+    var elements = document.querySelectorAll('b, span, td, div, p, font, strong');
     var expiredItemsMap = {};
     var warningItemsMap = {};
 
-    // --- TARGET TABLE ROWS DIRECTLY (Bypasses random DOM crawling) ---
-    var rows = document.querySelectorAll('tr');
+    for (var i = 0; i < elements.length; i++) {
+        var el = elements[i];
+        if (el.children.length === 0 && el.textContent.trim().length > 0) {
+            
+            var text = el.textContent.trim();
+            var isRed = isRedOrExpired(el);
+            
+            // Regex to find date formats like "31 Jul 2026" or "05 August 2024"
+            var dateMatch = text.match(/\b\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}\b/i);
+            var isDate = !!dateMatch;
+            
+            if (isRed || isDate || text.toUpperCase() === 'EXPIRED') {
+                var dateText = isDate ? dateMatch[0] : text;
+                var labelText = "";
+                var isException = false;
+                
+                var tr = el.closest('tr');
+                var card = el.closest('.card');
+                
+                if (tr) {
+                    var rowNormalized = tr.textContent.toUpperCase().replace(/\s+/g, '');
+                    if (rowNormalized.includes('CLASS1(SC)') || rowNormalized.includes('CLASS1SC')) {
+                        isException = true;
+                    } else {
+                        var labelTd = tr.querySelector('.text-left') || tr.querySelector('td');
+                        if (labelTd) labelText = labelTd.textContent.replace('•', '').trim();
+                    }
+                } else if (card) {
+                    var cardNormalized = card.textContent.toUpperCase().replace(/\s+/g, '');
+                    if (cardNormalized.includes('CLASS1(SC)')) {
+                        isException = true;
+                    } else {
+                        var titleEl = card.querySelector('.col-sm-12 .bg-gray-300') || 
+                                      card.querySelector('div[style*="font-weight: 500"]') || 
+                                      card.querySelector('.fs-5');
+                        if (titleEl) labelText = titleEl.textContent.trim();
 
-    for (var r = 0; r < rows.length; r++) {
-        var tr = rows[r];
-        var rowUpper = tr.textContent.toUpperCase();
-
-        // --- BULLETPROOF DISCLAIMER / FOOTER ROW EXCLUSION ---
-        if (rowUpper.includes('CIVIL AVIATION') || 
-            rowUpper.includes('ANNEX 1') || 
-            rowUpper.includes('CONVENTION') || 
-            rowUpper.includes('1944') || 
-            rowUpper.includes('1969') || 
-            rowUpper.includes('CLASS1(SC)') ||
-            rowUpper.includes('CLASS1SC')) {
-            continue;
-        }
-
-        var tds = tr.querySelectorAll('td');
-        if (tds.length === 0) continue;
-
-        // Get qualification label from the first column or designated label cell
-        var labelTd = tr.querySelector('.text-left') || tds[0];
-        var labelText = labelTd ? labelTd.textContent.replace('•', '').trim() : "Qualification";
-        labelText = labelText.replace(/\s+/g, ' ');
-
-        // Skip if label is a Roman numeral footnote (e.g. "VIII", "IX")
-        if (/^[IVXLCDM]+\.?$/i.test(labelText)) {
-            continue;
-        }
-
-        // Iterate through cells in this qualification row
-        for (var c = 0; c < tds.length; c++) {
-            var td = tds[c];
-            // If it's column index 1 (issue date column) and NOT red, ignore it completely
-            var isIssueCol = (c === 1 && tds.length >= 3);
-
-            var dateElements = td.querySelectorAll('b, span, strong, font');
-            if (dateElements.length === 0) {
-                dateElements = [td];
-            }
-
-            for (var d = 0; d < dateElements.length; d++) {
-                var el = dateElements[d];
-                var text = el.textContent.trim();
-                var isRed = isRedOrExpired(el);
-
-                if (isIssueCol && !isRed) {
-                    continue; // Skip past issue date
+                        if (!isDate && text.toUpperCase() !== 'EXPIRED') {
+                             var dateEl = card.querySelector('.text-uppercase b') || card.querySelector('.fs-4 b, .fs-3 b');
+                             if (dateEl) dateText = dateEl.textContent.trim();
+                        }
+                    }
                 }
 
-                // Bilingual date regex (supports English and Bahasa Melayu months)
-                var dateMatch = text.match(/\b\d{1,2}\s+(Jan|Feb|Mar|Mac|Apr|May|Mei|Jun|Jul|Aug|Ogos|Sep|Oct|Okt|Nov|Dec|Dis)[a-z]*\s+\d{4}\b/i);
-                var isDate = !!dateMatch;
+                if (!labelText) labelText = "Qualification";
+                labelText = labelText.replace(/\s+/g, ' ');
 
-                if (isDate || isRed || text.toUpperCase() === 'EXPIRED') {
-                    var dateText = isDate ? dateMatch[0] : text;
+                if (!isException) {
                     var status = "VALID";
-
+                    
+                    // Fallback to EXPIRED if portal styled it red manually
                     if (isRed || text.toUpperCase() === 'EXPIRED') {
                         status = "EXPIRED";
-                    }
-
+                    } 
+                    
+                    // Mathematical Date Evaluation
                     if (isDate) {
-                        // Normalize Malay month names for reliable JS Date parsing
-                        var normalizedDateStr = dateMatch[0]
-                            .replace(/Mac/gi, 'Mar')
-                            .replace(/Mei/gi, 'May')
-                            .replace(/Ogos/gi, 'Aug')
-                            .replace(/Okt/gi, 'Oct')
-                            .replace(/Dis/gi, 'Dec');
-
-                        var dt = new Date(normalizedDateStr);
+                        var d = new Date(dateMatch[0]);
                         var now = new Date();
-                        now.setHours(0,0,0,0);
-
-                        var diffDays = Math.ceil((dt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-
+                        now.setHours(0,0,0,0); // Reset time to midnight for accurate day calc
+                        
+                        var diffDays = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                        
                         if (diffDays < 0) {
                             status = "EXPIRED";
                         } else if (diffDays <= WARNING_DAYS) {
@@ -119,9 +111,10 @@ window.runLicenseChecker = function(callback) {
                         }
                     }
 
+                    // Route to correct map (prevents duplicates)
                     if (status === "EXPIRED") {
                         expiredItemsMap[labelText] = labelText + " : <b>" + dateText + "</b>";
-                        delete warningItemsMap[labelText];
+                        delete warningItemsMap[labelText]; // Priority override if duplicate found
                     } else if (status === "WARNING") {
                         if (!expiredItemsMap[labelText]) {
                             warningItemsMap[labelText] = labelText + " : <b>" + dateText + "</b>";
@@ -152,6 +145,7 @@ window.runLicenseChecker = function(callback) {
 
     var statusConfig = {};
     
+    // Determine the active UI State
     if (expiredItems.length > 0) {
         var comboList = expiredItems.slice();
         if (warningItems.length > 0) {
@@ -165,15 +159,15 @@ window.runLicenseChecker = function(callback) {
             titleColor: '#d32f2f',
             titleText: 'Qualification Expired / Invalid',
             tagBg: '#ef4444',
-            tagText: 'ACTION REQUIRED!',
+            tagText: 'DO NOT FLY!',
             detailsText: comboList.join('\n\n')
         };
     } else if (warningItems.length > 0) {
         statusConfig = {
-            overlayBg: 'rgba(245, 158, 11, 0.35)',
-            badgeBg: '#f59e0b',
+            overlayBg: 'rgba(245, 158, 11, 0.35)', // Amber transparent
+            badgeBg: '#f59e0b', // Amber solid
             icon: '⚠️',
-            titleColor: '#b45309',
+            titleColor: '#b45309', // Dark Amber text
             titleText: 'Action Required Soon',
             tagBg: '#f59e0b',
             tagText: 'EXPIRING IN ≤ ' + WARNING_DAYS + ' DAYS',
@@ -187,7 +181,7 @@ window.runLicenseChecker = function(callback) {
             titleColor: '#2e7d32',
             titleText: 'All Qualifications Valid',
             tagBg: '#22c55e',
-            tagText: 'ALL CLEAR',
+            tagText: 'HAVE A SAFE FLIGHT!',
             detailsText: 'All checked licence qualifications are valid.'
         };
     }
@@ -227,6 +221,7 @@ window.runLicenseChecker = function(callback) {
     document.body.appendChild(overlay);
 
     if (typeof callback === 'function') {
+        // Return both arrays so console logs show exactly what triggered it
         callback({ expired: expiredItems, warnings: warningItems });
     }
 };
