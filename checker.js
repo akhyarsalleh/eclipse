@@ -14,8 +14,13 @@ window.runLicenseChecker = function(callback) {
         'TARIKH KELUARAN', 'TARIKH DIKELUARKAN', 'TARIKH ISU'
     ];
 
+    var EXPIRY_DATE_KEYWORDS = [
+        'VALIDITY EXPIRY DATE', 'EXPIRY DATE', 'DATE OF EXPIRY',
+        'TARIKH LUPUT', 'TARIKH TAMAT', 'VALID UNTIL'
+    ];
+
     var IGNORED_DATES = [
-        '01 Jan 1900',
+        '01 JAN 1900',
         '00/00/0000'
     ];
     // ---------------------------------------
@@ -23,7 +28,7 @@ window.runLicenseChecker = function(callback) {
     var existingOverlay = document.getElementById('license-checker-overlay');
     if (existingOverlay) existingOverlay.remove();
 
-    // Custom parser to prevent Safari/WebKit "Invalid Date" bugs
+    // Robust Date parsing for cross-browser / Safari compatibility
     function parseCustomDate(dateStr) {
         var m = dateStr.match(/(\d{1,2})\s+([A-Za-z]{3,})\s+(\d{4})/);
         if (!m) return null;
@@ -44,9 +49,12 @@ window.runLicenseChecker = function(callback) {
         if (text === 'EXPIRED') return true;
 
         var inlineStyle = (el.getAttribute('style') || '').toLowerCase();
-        if (inlineStyle.includes('color: red') || inlineStyle.includes('color:red') || inlineStyle.includes('color: #ff0000') ||
-            inlineStyle.includes('background: #ff0000') || inlineStyle.includes('background:#ff0000') || 
-            inlineStyle.includes('background: red') || inlineStyle.includes('background-color: red')) {
+        var parentStyle = el.parentElement ? (el.parentElement.getAttribute('style') || '').toLowerCase() : '';
+        var combinedInline = inlineStyle + ' ' + parentStyle;
+
+        if (combinedInline.includes('color: red') || combinedInline.includes('color:red') || 
+            combinedInline.includes('color: #ff0000') || combinedInline.includes('color:#ff0000') ||
+            combinedInline.includes('background: red') || combinedInline.includes('background: #ff0000')) {
             return true;
         }
 
@@ -56,15 +64,10 @@ window.runLicenseChecker = function(callback) {
             var r = parseInt(matchColor[1], 10), g = parseInt(matchColor[2], 10), b = parseInt(matchColor[3], 10);
             if (r > 180 && r > g + 50 && r > b + 50) return true;
         }
-
-        var matchBg = style.backgroundColor.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-        if (matchBg) {
-            var s = parseInt(matchBg[1], 10), u = parseInt(matchBg[2], 10), p = parseInt(matchBg[3], 10);
-            if (s > 180 && s > u + 50 && s > p + 50) return true;
-        }
         return false;
     }
 
+    // Resolves the associated <thead> column title for any given <td> cell
     function getColumnHeader(el) {
         var td = el.closest('td, th');
         if (!td) return '';
@@ -82,6 +85,7 @@ window.runLicenseChecker = function(callback) {
         return '';
     }
 
+    // Gets licence descriptor from column 1 (e.g. CPL(A))
     function getRowLeadLabel(el) {
         var td = el.closest('td, th');
         if (!td) return '';
@@ -96,14 +100,20 @@ window.runLicenseChecker = function(callback) {
         return '';
     }
 
-    function getImmediateCellContext(el) {
-        var td = el.closest('td, th');
-        if (td) return td.textContent.toUpperCase();
-        return el.textContent.toUpperCase();
-    }
+    function findLabelText(el, colHeader) {
+        var isExpiryCol = false;
+        for (var e = 0; e < EXPIRY_DATE_KEYWORDS.length; e++) {
+            if (colHeader.includes(EXPIRY_DATE_KEYWORDS[e])) {
+                isExpiryCol = true;
+                break;
+            }
+        }
 
-    function findLabelText(el) {
         var leadLabel = getRowLeadLabel(el);
+        if (isExpiryCol) {
+            return leadLabel ? 'Certificate of Validity (' + leadLabel + ')' : 'Certificate of Validity';
+        }
+
         if (leadLabel) return leadLabel;
 
         var tr = el.closest('tr');
@@ -116,18 +126,9 @@ window.runLicenseChecker = function(callback) {
                 }
             }
         }
-        
-        var card = el.closest('.card');
-        if (card) {
-            var titleEl = card.querySelector('.col-sm-12 .bg-gray-300') || 
-                          card.querySelector('div[style*="font-weight: 500"]') || 
-                          card.querySelector('.fs-5');
-            if (titleEl) return titleEl.textContent.trim();
-        }
         return "Qualification";
     }
 
-    // Ignores structural line-breaks when assessing if an element is a text container
     function isLeafElement(el) {
         var childElements = Array.prototype.slice.call(el.children).filter(function(child) {
             return child.tagName !== 'BR' && child.tagName !== 'HR';
@@ -154,9 +155,9 @@ window.runLicenseChecker = function(callback) {
                 var isException = false;
                 
                 var colHeader = getColumnHeader(el);
-                var immediateContext = getImmediateCellContext(el);
+                var immediateContext = (el.closest('td') || el).textContent.toUpperCase();
 
-                // 1. Column Header check: Ignore if specifically under an Issue Date header
+                // 1. Column Header check: Ignore if under Issue Date header
                 for (var h = 0; h < ISSUE_DATE_KEYWORDS.length; h++) {
                     if (colHeader.includes(ISSUE_DATE_KEYWORDS[h])) {
                         isException = true;
@@ -164,7 +165,7 @@ window.runLicenseChecker = function(callback) {
                     }
                 }
 
-                // 2. Field keyword check: Scope strictly to current column header or immediate cell text
+                // 2. Field keyword check (Date of Birth, etc.)
                 if (!isException) {
                     for (var k = 0; k < IGNORED_FIELD_KEYWORDS.length; k++) {
                         var kw = IGNORED_FIELD_KEYWORDS[k];
@@ -175,23 +176,18 @@ window.runLicenseChecker = function(callback) {
                     }
                 }
 
-                // 3. Ignore timestamp strings (e.g., "22:34:34")
+                // 3. Ignore timestamp strings
                 if (/\b\d{1,2}:\d{2}(:\d{2})?\b/.test(text)) {
                     isException = true;
                 }
 
-                // 4. Ignore CEO signature block
-                if (document.querySelector('.ceosignature') && (el.closest('.ceosignature') || (el.closest('tr') && el.closest('tr').querySelector('.ceosignature')))) {
-                    isException = true;
-                }
-
-                // 5. Ignore static date values
-                if (IGNORED_DATES.indexOf(dateText) !== -1) {
+                // 4. Ignore static date values
+                if (IGNORED_DATES.indexOf(dateText.toUpperCase()) !== -1) {
                     isException = true;
                 }
 
                 if (!isException) {
-                    var labelText = findLabelText(el);
+                    var labelText = findLabelText(el, colHeader);
                     labelText = labelText.replace(/\s+/g, ' ');
                     var status = "VALID";
                     
