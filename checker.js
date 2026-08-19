@@ -43,15 +43,14 @@ window.runLicenseChecker = function(callback) {
             var text = el.textContent.trim();
             
             // --- TOP-LEVEL BULLETPROOF 1944 EXCLUSION ---
-            // Skips any element containing 1944 instantly before any other logic runs
             if (text.includes('1944')) {
                 continue;
             }
             
             var isRed = isRedOrExpired(el);
             
-            // Regex to find date formats like "31 Jul 2026"
-            var dateMatch = text.match(/\b\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}\b/i);
+            // --- BILINGUAL DATE REGEX (English & Bahasa Melayu months) ---
+            var dateMatch = text.match(/\b\d{1,2}\s+(Jan|Feb|Mar|Mac|Apr|May|Mei|Jun|Jul|Aug|Ogos|Sep|Oct|Okt|Nov|Dec|Dis)[a-z]*\s+\d{4}\b/i);
             var isDate = !!dateMatch;
             
             if (isRed || isDate || text.toUpperCase() === 'EXPIRED') {
