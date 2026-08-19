@@ -165,9 +165,13 @@ window.runLicenseChecker = function(callback) {
                     }
                 }
 
-                // 3. Ignore date strings containing time components (HH:mm:ss or HH:mm)
-                if (/\b\d{1,2}:\d{2}(:\d{2})?\b/.test(text) || /\b\d{1,2}:\d{2}(:\d{2})?\b/.test(immediateContext)) {
-                    isException = true;
+                // 3. STRICT CHECK: Ignore ONLY if a full HH:mm:ss timestamp is present
+                if (!isException) {
+                    // Check parent cell text in case the timestamp is sitting outside the <b> tag
+                    var cellText = el.closest('td') ? el.closest('td').textContent : text;
+                    if (/\d{1,2}:\d{2}:\d{2}/.test(cellText)) {
+                        isException = true;
+                    }
                 }
 
                 // 4. Ignore static date values
