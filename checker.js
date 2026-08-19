@@ -43,9 +43,14 @@ window.runLicenseChecker = function(callback) {
             var text = el.textContent.trim();
             var isRed = isRedOrExpired(el);
             
-            // Regex to find date formats like "31 Jul 2026" or "7 December 1944"
+            // Regex to find date formats like "31 Jul 2026" or "07 December 1944"
             var dateMatch = text.match(/\b\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}\b/i);
             var isDate = !!dateMatch;
+            
+            // --- BLANKET IGNORE RULE FOR 1944 ---
+            if (isDate && dateMatch[0].includes('1944')) {
+                continue;
+            }
             
             if (isRed || isDate || text.toUpperCase() === 'EXPIRED') {
                 var dateText = isDate ? dateMatch[0] : text;
@@ -58,28 +63,17 @@ window.runLicenseChecker = function(callback) {
                 if (tr) {
                     var tds = tr.querySelectorAll('td');
                     
-                    // --- EXCLUSION FILTERS ---
-                    
-                    // 1. Statutory / Footer / Historical Text Exclusion (e.g., Chicago Convention 1944 row)
-                    var rowText = tr.textContent.toUpperCase();
-                    if (tr.querySelector('.licenceNumbering') || 
-                        rowText.includes('CIVIL AVIATION ACT') || 
-                        rowText.includes('CONVENTION ON THE INTERNATIONAL CIVIL AVIATION')) {
-                        isException = true;
-                    }
-
-                    // 2. Column 1 (Issue Date) Exclusion
-                    if (!isException && tds.length >= 3) {
+                    // --- COLUMN 1 (ISSUE DATE) EXCLUSION ---
+                    if (tds.length >= 3) {
                         var targetTd = el.closest('td');
                         var colIndex = Array.prototype.indexOf.call(tds, targetTd);
                         
-                        // If it's in the 2nd column (index 1 / Issue Date) and NOT explicitly red, ignore it entirely
                         if (colIndex === 1 && !isRed) {
                             isException = true;
                         }
                     }
 
-                    var rowNormalized = rowText.replace(/\s+/g, '');
+                    var rowNormalized = tr.textContent.toUpperCase().replace(/\s+/g, '');
                     if (rowNormalized.includes('CLASS1(SC)') || rowNormalized.includes('CLASS1SC')) {
                         isException = true;
                     } else if (!isException) {
@@ -106,12 +100,10 @@ window.runLicenseChecker = function(callback) {
                 if (!labelText) labelText = "Qualification";
                 labelText = labelText.replace(/\s+/g, ' ');
 
-                // If flagged as an exception, skip processing
                 if (isException) continue;
 
                 var status = "VALID";
                 
-                // Fallback to EXPIRED if portal styled it red manually
                 if (isRed || text.toUpperCase() === 'EXPIRED') {
                     status = "EXPIRED";
                 } 
@@ -120,7 +112,7 @@ window.runLicenseChecker = function(callback) {
                 if (isDate) {
                     var d = new Date(dateMatch[0]);
                     var now = new Date();
-                    now.setHours(0,0,0,0); // Reset time to midnight for accurate day calc
+                    now.setHours(0,0,0,0);
                     
                     var diffDays = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
                     
@@ -136,10 +128,9 @@ window.runLicenseChecker = function(callback) {
                     }
                 }
 
-                // Route to correct map (prevents duplicates)
                 if (status === "EXPIRED") {
                     expiredItemsMap[labelText] = labelText + " : <b>" + dateText + "</b>";
-                    delete warningItemsMap[labelText]; // Priority override if duplicate found
+                    delete warningItemsMap[labelText];
                 } else if (status === "WARNING") {
                     if (!expiredItemsMap[labelText]) {
                         warningItemsMap[labelText] = labelText + " : <b>" + dateText + "</b>";
