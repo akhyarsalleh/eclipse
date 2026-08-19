@@ -41,9 +41,16 @@ window.runLicenseChecker = function(callback) {
         if (el.children.length === 0 && el.textContent.trim().length > 0) {
             
             var text = el.textContent.trim();
+            var tr = el.closest('tr');
             
-            // --- TOP-LEVEL BULLETPROOF 1944 EXCLUSION ---
-            if (text.includes('1944')) {
+            // --- BULLETPROOF ROW-LEVEL LEGAL DISCLAIMER EXCLUSION ---
+            // If the element or its parent row contains legal text or 1944, skip it entirely
+            var rowText = tr ? tr.textContent.toUpperCase() : "";
+            if (text.includes('1944') || 
+                rowText.includes('CIVIL AVIATION ACT') || 
+                rowText.includes('CONVENTION') || 
+                rowText.includes('ANNEX 1') || 
+                rowText.includes('1944')) {
                 continue;
             }
             
@@ -58,7 +65,6 @@ window.runLicenseChecker = function(callback) {
                 var labelText = "";
                 var isException = false;
                 
-                var tr = el.closest('tr');
                 var card = el.closest('.card');
                 
                 if (tr) {
@@ -74,7 +80,7 @@ window.runLicenseChecker = function(callback) {
                         }
                     }
 
-                    var rowNormalized = tr.textContent.toUpperCase().replace(/\s+/g, '');
+                    var rowNormalized = rowText.replace(/\s+/g, '');
                     if (rowNormalized.includes('CLASS1(SC)') || rowNormalized.includes('CLASS1SC')) {
                         isException = true;
                     } else if (!isException) {
