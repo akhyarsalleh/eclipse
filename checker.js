@@ -3,7 +3,7 @@ window.runLicenseChecker = function(callback) {
     var WARNING_DAYS = 14; // Alert if expiring within this many days
     
     // Static date to always ignore
-    var IGNORED_STATIC_DATE = "7 DECEMBER 1944";
+    var IGNORED_STATIC_DATE = "7 December 1944";
     // ---------------------
 
     var existingOverlay = document.getElementById('license-checker-overlay');
