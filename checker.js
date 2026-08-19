@@ -2,8 +2,6 @@ window.runLicenseChecker = function(callback) {
     // --- CONFIGURATION ---
     var WARNING_DAYS = 14; // Alert if expiring within this many days
     
-    // Add keywords here to filter out false positive dates 
-    // (e.g., birthdays, issue dates, application dates)
     var IGNORE_KEYWORDS = [
         'DATE OF BIRTH', 'TARIKH LAHIR', 'D.O.B', 'DOB',
         'ISSUE DATE', 'DATE OF ISSUE', 'TARIKH KELUARAN',
@@ -62,9 +60,9 @@ window.runLicenseChecker = function(callback) {
                 
                 var tr = el.closest('tr');
                 var card = el.closest('.card');
+                var td = el.closest('td, th');
                 
                 // --- FALSE POSITIVE FILTERING ---
-                // Grab the text of the entire row or card
                 var contextText = "";
                 if (tr) contextText = tr.textContent.toUpperCase();
                 else if (card) contextText = card.textContent.toUpperCase();
@@ -78,9 +76,17 @@ window.runLicenseChecker = function(callback) {
                     }
                 }
 
-                // 2. Ignore timestamps (e.g., system print dates like 14:25:00 or 10:30 AM)
+                // 2. Ignore system timestamps (e.g., 14:25:00)
                 if (/\b\d{1,2}:\d{2}(:\d{2})?\b/.test(contextText)) {
                     isException = true;
+                }
+
+                // 3. Ignore Issue Date column (Index 1 in 3-column rows, e.g., "10 AUG 2026")
+                if (tr && td) {
+                    var cellIndex = Array.prototype.indexOf.call(tr.children, td);
+                    if (cellIndex === 1 && tr.children.length >= 3) {
+                        isException = true;
+                    }
                 }
                 // --------------------------------
 
@@ -88,7 +94,7 @@ window.runLicenseChecker = function(callback) {
                     var rowNormalized = contextText.replace(/\s+/g, '');
                     if (rowNormalized.includes('CLASS1(SC)') || rowNormalized.includes('CLASS1SC')) {
                         isException = true;
-                    } else if (!isException) { // Only extract label if it passed filters
+                    } else if (!isException) {
                         var labelTd = tr.querySelector('.text-left') || tr.querySelector('td');
                         if (labelTd) labelText = labelTd.textContent.replace('•', '').trim();
                     }
@@ -250,7 +256,6 @@ window.runLicenseChecker = function(callback) {
     document.body.appendChild(overlay);
 
     if (typeof callback === 'function') {
-        // Return both arrays so console logs show exactly what triggered it
         callback({ expired: expiredItems, warnings: warningItems });
     }
 };
