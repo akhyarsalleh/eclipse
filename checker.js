@@ -1,9 +1,6 @@
 window.runLicenseChecker = function(callback) {
     // --- CONFIGURATION ---
     var WARNING_DAYS = 14; // Alert if expiring within this many days
-    
-    // Static date to always ignore
-    var IGNORED_STATIC_DATE = "7 December 1944";
     // ---------------------
 
     var existingOverlay = document.getElementById('license-checker-overlay');
@@ -44,15 +41,9 @@ window.runLicenseChecker = function(callback) {
         if (el.children.length === 0 && el.textContent.trim().length > 0) {
             
             var text = el.textContent.trim();
-            
-            // Exact static date check: ignore if it matches "7 December 1944" exactly
-            if (text.toUpperCase() === IGNORED_STATIC_DATE) {
-                continue;
-            }
-
             var isRed = isRedOrExpired(el);
             
-            // Regex to find date formats like "31 Jul 2026" or "05 August 2024"
+            // Regex to find date formats like "31 Jul 2026" or "7 December 1944"
             var dateMatch = text.match(/\b\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}\b/i);
             var isDate = !!dateMatch;
             
@@ -67,12 +58,18 @@ window.runLicenseChecker = function(callback) {
                 if (tr) {
                     var tds = tr.querySelectorAll('td');
                     
-                    // --- STRICT COLUMN 1 (ISSUE DATE) EXCLUSION ---
+                    // --- EXCEPTION RULES ---
+                    
+                    // 1. Ignore "7 December 1944" or any row starting with numbering "VIII"
+                    var numberingTd = tr.querySelector('.licenceNumbering');
+                    if (numberingTd && numberingTd.textContent.trim() === 'VIII') {
+                        isException = true;
+                    }
+
+                    // 2. Strict Column 1 (Issue Date) exclusion if not explicitly red
                     if (tds.length >= 3) {
                         var targetTd = el.closest('td');
                         var colIndex = Array.prototype.indexOf.call(tds, targetTd);
-                        
-                        // If it's in the 2nd column (index 1 / Issue Date) and NOT explicitly red, ignore it entirely
                         if (colIndex === 1 && !isRed) {
                             isException = true;
                         }
@@ -105,7 +102,7 @@ window.runLicenseChecker = function(callback) {
                 if (!labelText) labelText = "Qualification";
                 labelText = labelText.replace(/\s+/g, ' ');
 
-                // If flagged as an exception by column rule or class filter, skip processing
+                // If flagged as an exception, skip processing
                 if (isException) continue;
 
                 var status = "VALID";
