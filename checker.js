@@ -41,16 +41,18 @@ window.runLicenseChecker = function(callback) {
         if (el.children.length === 0 && el.textContent.trim().length > 0) {
             
             var text = el.textContent.trim();
-            var isRed = isRedOrExpired(el);
             
-            // Regex to find date formats like "31 Jul 2026" or "07 December 1944"
-            var dateMatch = text.match(/\b\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}\b/i);
-            var isDate = !!dateMatch;
-            
-            // --- BLANKET IGNORE RULE FOR 1944 ---
-            if (isDate && dateMatch[0].includes('1944')) {
+            // --- TOP-LEVEL BULLETPROOF 1944 EXCLUSION ---
+            // Skips any element containing 1944 instantly before any other logic runs
+            if (text.includes('1944')) {
                 continue;
             }
+            
+            var isRed = isRedOrExpired(el);
+            
+            // Regex to find date formats like "31 Jul 2026"
+            var dateMatch = text.match(/\b\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}\b/i);
+            var isDate = !!dateMatch;
             
             if (isRed || isDate || text.toUpperCase() === 'EXPIRED') {
                 var dateText = isDate ? dateMatch[0] : text;
@@ -173,7 +175,7 @@ window.runLicenseChecker = function(callback) {
             titleColor: '#d32f2f',
             titleText: 'Qualification Expired / Invalid',
             tagBg: '#ef4444',
-            tagText: 'DO NOT FLY!',
+            tagText: 'ACTION REQUIRED!',
             detailsText: comboList.join('\n\n')
         };
     } else if (warningItems.length > 0) {
@@ -195,7 +197,7 @@ window.runLicenseChecker = function(callback) {
             titleColor: '#2e7d32',
             titleText: 'All Qualifications Valid',
             tagBg: '#22c55e',
-            tagText: 'HAVE A SAFE FLIGHT!',
+            tagText: 'ALL CLEAR',
             detailsText: 'All checked licence qualifications are valid.'
         };
     }
