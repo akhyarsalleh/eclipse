@@ -1,55 +1,27 @@
 window.runLicenseChecker = function(callback) {
-    // --- CONFIGURATION & EXCEPTION LISTS ---
+    // --- CONFIGURATION ---
     var WARNING_DAYS = 14; // Alert if expiring within this many days
-
-    var IGNORED_FIELD_KEYWORDS = [
-        'DATE OF BIRTH', 'TARIKH LAHIR', 'BIRTH', 'LAHIR', 'D.O.B', 'DOB',
-        'NATIONALITY', 'WARGANEGARA', 'GENDER', 'JANTINA',
-        'EXAM DATE', 'DATE OF EXAMINATION', 'TARIKH PEPERIKSAAN',
+    
+    // Add keywords here to filter out false positive dates 
+    // (e.g., birthdays, issue dates, application dates)
+    var IGNORE_KEYWORDS = [
+        'DATE OF BIRTH', 'TARIKH LAHIR', 'D.O.B', 'DOB',
+        'ISSUE DATE', 'DATE OF ISSUE', 'TARIKH KELUARAN',
         'APPLICATION DATE', 'TARIKH PERMOHONAN', 'LAST RENEWAL'
     ];
-
-    var ISSUE_DATE_KEYWORDS = [
-        'VALIDITY ISSUE DATE', 'ISSUE DATE', 'DATE OF ISSUE', 
-        'TARIKH KELUARAN', 'TARIKH DIKELUARKAN', 'TARIKH ISU'
-    ];
-
-    var IGNORED_DATES = [
-        '07 DEC 1944',
-        '07/12/1944'
-    ];
-    // ---------------------------------------
+    // ---------------------
 
     var existingOverlay = document.getElementById('license-checker-overlay');
     if (existingOverlay) existingOverlay.remove();
-
-    // Cross-browser/Safari safe date parser
-    function parseCustomDate(dateStr) {
-        var m = dateStr.match(/(\d{1,2})\s+([A-Za-z]{3,})\s+(\d{4})/);
-        if (!m) return null;
-        var day = parseInt(m[1], 10);
-        var monthStr = m[2].substring(0, 3).toUpperCase();
-        var year = parseInt(m[3], 10);
-        
-        var months = {
-            'JAN':0, 'FEB':1, 'MAR':2, 'APR':3, 'MAY':4, 'JUN':5,
-            'JUL':6, 'AUG':7, 'SEP':8, 'OCT':9, 'NOV':10, 'DEC':11
-        };
-        if (months[monthStr] === undefined) return null;
-        return new Date(year, months[monthStr], day);
-    }
 
     function isRedOrExpired(el) {
         var text = el.textContent.trim().toUpperCase();
         if (text === 'EXPIRED') return true;
 
         var inlineStyle = (el.getAttribute('style') || '').toLowerCase();
-        var parentStyle = el.parentElement ? (el.parentElement.getAttribute('style') || '').toLowerCase() : '';
-        var combinedInline = inlineStyle + ' ' + parentStyle;
-
-        if (combinedInline.includes('color: red') || combinedInline.includes('color:red') || 
-            combinedInline.includes('color: #ff0000') || combinedInline.includes('color:#ff0000') ||
-            combinedInline.includes('background: red') || combinedInline.includes('background: #ff0000')) {
+        if (inlineStyle.includes('color: red') || inlineStyle.includes('color:red') || inlineStyle.includes('color: #ff0000') ||
+            inlineStyle.includes('background: #ff0000') || inlineStyle.includes('background:#ff0000') || 
+            inlineStyle.includes('background: red') || inlineStyle.includes('background-color: red')) {
             return true;
         }
 
@@ -59,70 +31,13 @@ window.runLicenseChecker = function(callback) {
             var r = parseInt(matchColor[1], 10), g = parseInt(matchColor[2], 10), b = parseInt(matchColor[3], 10);
             if (r > 180 && r > g + 50 && r > b + 50) return true;
         }
+
+        var matchBg = style.backgroundColor.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+        if (matchBg) {
+            var s = parseInt(matchBg[1], 10), u = parseInt(matchBg[2], 10), p = parseInt(matchBg[3], 10);
+            if (s > 180 && s > u + 50 && s > p + 50) return true;
+        }
         return false;
-    }
-
-    function getColumnHeader(el) {
-        var td = el.closest('td, th');
-        if (!td) return '';
-        var tr = td.parentElement;
-        if (!tr) return '';
-        var cellIndex = Array.prototype.indexOf.call(tr.children, td);
-        
-        var table = tr.closest('table');
-        if (!table) return '';
-        
-        var headerTr = table.querySelector('thead tr') || table.querySelector('tr');
-        if (headerTr && headerTr !== tr && headerTr.children[cellIndex]) {
-            return headerTr.children[cellIndex].textContent.trim().toUpperCase();
-        }
-        return '';
-    }
-
-    function getRowLeadLabel(el) {
-        var td = el.closest('td, th');
-        if (!td) return '';
-        var tr = td.parentElement;
-        if (!tr) return '';
-        
-        var firstTd = tr.children[0];
-        if (firstTd && firstTd !== td) {
-            var txt = firstTd.textContent.replace('•', '').trim();
-            if (txt.length > 0) return txt;
-        }
-        return '';
-    }
-
-    function findLabelText(el) {
-        var leadLabel = getRowLeadLabel(el);
-        if (leadLabel) return leadLabel;
-
-        var tr = el.closest('tr');
-        if (tr) {
-            var tds = tr.querySelectorAll('td');
-            for (var i = 0; i < tds.length; i++) {
-                var txt = tds[i].textContent.trim();
-                if (txt.length > 0 && !tds[i].contains(el)) {
-                    return txt.replace('•', '').trim();
-                }
-            }
-        }
-
-        var card = el.closest('.card');
-        if (card) {
-            var titleEl = card.querySelector('.col-sm-12 .bg-gray-300') || 
-                          card.querySelector('div[style*="font-weight: 500"]') || 
-                          card.querySelector('.fs-5');
-            if (titleEl) return titleEl.textContent.trim();
-        }
-        return "Qualification";
-    }
-
-    function isLeafElement(el) {
-        var childElements = Array.prototype.slice.call(el.children).filter(function(child) {
-            return child.tagName !== 'BR' && child.tagName !== 'HR';
-        });
-        return childElements.length === 0;
     }
 
     var elements = document.querySelectorAll('b, span, td, div, p, font, strong');
@@ -131,87 +46,104 @@ window.runLicenseChecker = function(callback) {
 
     for (var i = 0; i < elements.length; i++) {
         var el = elements[i];
-        if (isLeafElement(el) && el.textContent.trim().length > 0) {
+        if (el.children.length === 0 && el.textContent.trim().length > 0) {
             
             var text = el.textContent.trim();
             var isRed = isRedOrExpired(el);
             
+            // Regex to find date formats like "31 Jul 2026" or "05 August 2024"
             var dateMatch = text.match(/\b\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}\b/i);
             var isDate = !!dateMatch;
             
             if (isRed || isDate || text.toUpperCase() === 'EXPIRED') {
                 var dateText = isDate ? dateMatch[0] : text;
+                var labelText = "";
                 var isException = false;
                 
-                var colHeader = getColumnHeader(el);
-                var immediateContext = (el.closest('td') || el).textContent.toUpperCase();
+                var tr = el.closest('tr');
+                var card = el.closest('.card');
+                
+                // --- FALSE POSITIVE FILTERING ---
+                // Grab the text of the entire row or card
+                var contextText = "";
+                if (tr) contextText = tr.textContent.toUpperCase();
+                else if (card) contextText = card.textContent.toUpperCase();
+                else contextText = (el.parentElement || el).textContent.toUpperCase();
 
-                // 1. Column Header check: Ignore if under Issue Date header
-                for (var h = 0; h < ISSUE_DATE_KEYWORDS.length; h++) {
-                    if (colHeader.includes(ISSUE_DATE_KEYWORDS[h])) {
+                // 1. Check against the IGNORE_KEYWORDS list
+                for (var k = 0; k < IGNORE_KEYWORDS.length; k++) {
+                    if (contextText.includes(IGNORE_KEYWORDS[k])) {
                         isException = true;
                         break;
                     }
                 }
 
-                // 2. Field keyword check
-                if (!isException) {
-                    for (var k = 0; k < IGNORED_FIELD_KEYWORDS.length; k++) {
-                        var kw = IGNORED_FIELD_KEYWORDS[k];
-                        if (colHeader.includes(kw) || immediateContext.includes(kw)) {
-                            isException = true;
-                            break;
+                // 2. Ignore timestamps (e.g., system print dates like 14:25:00 or 10:30 AM)
+                if (/\b\d{1,2}:\d{2}(:\d{2})?\b/.test(contextText)) {
+                    isException = true;
+                }
+                // --------------------------------
+
+                if (tr) {
+                    var rowNormalized = contextText.replace(/\s+/g, '');
+                    if (rowNormalized.includes('CLASS1(SC)') || rowNormalized.includes('CLASS1SC')) {
+                        isException = true;
+                    } else if (!isException) { // Only extract label if it passed filters
+                        var labelTd = tr.querySelector('.text-left') || tr.querySelector('td');
+                        if (labelTd) labelText = labelTd.textContent.replace('•', '').trim();
+                    }
+                } else if (card) {
+                    var cardNormalized = contextText.replace(/\s+/g, '');
+                    if (cardNormalized.includes('CLASS1(SC)')) {
+                        isException = true;
+                    } else if (!isException) {
+                        var titleEl = card.querySelector('.col-sm-12 .bg-gray-300') || 
+                                      card.querySelector('div[style*="font-weight: 500"]') || 
+                                      card.querySelector('.fs-5');
+                        if (titleEl) labelText = titleEl.textContent.trim();
+
+                        if (!isDate && text.toUpperCase() !== 'EXPIRED') {
+                             var dateEl = card.querySelector('.text-uppercase b') || card.querySelector('.fs-4 b, .fs-3 b');
+                             if (dateEl) dateText = dateEl.textContent.trim();
                         }
                     }
                 }
 
-                // 3. STRICT CHECK: Ignore ONLY if a full HH:mm:ss timestamp is present
-                if (!isException) {
-                    // Check parent cell text in case the timestamp is sitting outside the <b> tag
-                    var cellText = el.closest('td') ? el.closest('td').textContent : text;
-                    if (/\d{1,2}:\d{2}:\d{2}/.test(cellText)) {
-                        isException = true;
-                    }
-                }
-
-                // 4. Ignore static date values
-                if (IGNORED_DATES.indexOf(dateText.toUpperCase()) !== -1) {
-                    isException = true;
-                }
+                if (!labelText) labelText = "Qualification";
+                labelText = labelText.replace(/\s+/g, ' ');
 
                 if (!isException) {
-                    var labelText = findLabelText(el);
-                    labelText = labelText.replace(/\s+/g, ' ');
                     var status = "VALID";
                     
+                    // Fallback to EXPIRED if portal styled it red manually
                     if (isRed || text.toUpperCase() === 'EXPIRED') {
                         status = "EXPIRED";
                     } 
                     
+                    // Mathematical Date Evaluation
                     if (isDate) {
-                        var d = parseCustomDate(dateMatch[0]);
-                        if (d) {
-                            var now = new Date();
-                            now.setHours(0,0,0,0);
-                            
-                            var diffDays = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-                            
-                            if (diffDays < 0) {
-                                status = "EXPIRED";
-                            } else if (diffDays <= WARNING_DAYS) {
-                                if (status !== "EXPIRED") {
-                                    status = "WARNING";
-                                }
-                                var dayString = diffDays === 1 ? 'day' : 'days';
-                                var dayStyle = status === "EXPIRED" ? "color:#dc2626;" : "color:#b45309;";
-                                dateText = dateMatch[0] + " <span style='" + dayStyle + " font-size: 0.85em; font-weight: bold;'>(" + diffDays + " " + dayString + " left)</span>";
+                        var d = new Date(dateMatch[0]);
+                        var now = new Date();
+                        now.setHours(0,0,0,0); // Reset time to midnight for accurate day calc
+                        
+                        var diffDays = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                        
+                        if (diffDays < 0) {
+                            status = "EXPIRED";
+                        } else if (diffDays <= WARNING_DAYS) {
+                            if (status !== "EXPIRED") {
+                                status = "WARNING";
                             }
+                            var dayString = diffDays === 1 ? 'day' : 'days';
+                            var dayStyle = status === "EXPIRED" ? "color:#dc2626;" : "color:#b45309;";
+                            dateText = dateMatch[0] + " <span style='" + dayStyle + " font-size: 0.85em; font-weight: bold;'>(" + diffDays + " " + dayString + " left)</span>";
                         }
                     }
 
+                    // Route to correct map (prevents duplicates)
                     if (status === "EXPIRED") {
                         expiredItemsMap[labelText] = labelText + " : <b>" + dateText + "</b>";
-                        delete warningItemsMap[labelText];
+                        delete warningItemsMap[labelText]; // Priority override if duplicate found
                     } else if (status === "WARNING") {
                         if (!expiredItemsMap[labelText]) {
                             warningItemsMap[labelText] = labelText + " : <b>" + dateText + "</b>";
@@ -225,6 +157,7 @@ window.runLicenseChecker = function(callback) {
     var expiredItems = Object.values(expiredItemsMap);
     var warningItems = Object.values(warningItemsMap);
 
+    // Render Overlay UI
     var overlay = document.createElement('div');
     overlay.id = 'license-checker-overlay';
     overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:999999;display:flex;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);';
@@ -241,6 +174,7 @@ window.runLicenseChecker = function(callback) {
 
     var statusConfig = {};
     
+    // Determine the active UI State
     if (expiredItems.length > 0) {
         var comboList = expiredItems.slice();
         if (warningItems.length > 0) {
@@ -254,15 +188,15 @@ window.runLicenseChecker = function(callback) {
             titleColor: '#d32f2f',
             titleText: 'Qualification Expired / Invalid',
             tagBg: '#ef4444',
-            tagText: 'EXPIRED QUALIFICATION DETECTED',
+            tagText: 'DO NOT FLY!',
             detailsText: comboList.join('\n\n')
         };
     } else if (warningItems.length > 0) {
         statusConfig = {
-            overlayBg: 'rgba(245, 158, 11, 0.35)',
-            badgeBg: '#f59e0b',
+            overlayBg: 'rgba(245, 158, 11, 0.35)', // Amber transparent
+            badgeBg: '#f59e0b', // Amber solid
             icon: '⚠️',
-            titleColor: '#b45309',
+            titleColor: '#b45309', // Dark Amber text
             titleText: 'Action Required Soon',
             tagBg: '#f59e0b',
             tagText: 'EXPIRING IN ≤ ' + WARNING_DAYS + ' DAYS',
@@ -276,7 +210,7 @@ window.runLicenseChecker = function(callback) {
             titleColor: '#2e7d32',
             titleText: 'All Qualifications Valid',
             tagBg: '#22c55e',
-            tagText: 'ALL CLEAR',
+            tagText: 'HAVE A SAFE FLIGHT!',
             detailsText: 'All checked licence qualifications are valid.'
         };
     }
@@ -316,6 +250,7 @@ window.runLicenseChecker = function(callback) {
     document.body.appendChild(overlay);
 
     if (typeof callback === 'function') {
+        // Return both arrays so console logs show exactly what triggered it
         callback({ expired: expiredItems, warnings: warningItems });
     }
 };
