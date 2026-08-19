@@ -1,14 +1,9 @@
 window.runLicenseChecker = function(callback) {
     // --- CONFIGURATION ---
     var WARNING_DAYS = 14; // Alert if expiring within this many days
-
-    // Static dates to completely ignore
-    var IGNORED_DATES = [
-        '07 DEC 1944',
-        '07/12/1944',
-        '07 DECEMBER 1944',
-        '7 DECEMBER 1944'
-    ];
+    
+    // Static date to always ignore
+    var IGNORED_STATIC_DATE = "7 DECEMBER 1944";
     // ---------------------
 
     var existingOverlay = document.getElementById('license-checker-overlay');
@@ -49,6 +44,12 @@ window.runLicenseChecker = function(callback) {
         if (el.children.length === 0 && el.textContent.trim().length > 0) {
             
             var text = el.textContent.trim();
+            
+            // Exact static date check: ignore if it matches "7 December 1944" exactly
+            if (text.toUpperCase() === IGNORED_STATIC_DATE) {
+                continue;
+            }
+
             var isRed = isRedOrExpired(el);
             
             // Regex to find date formats like "31 Jul 2026" or "05 August 2024"
@@ -59,11 +60,6 @@ window.runLicenseChecker = function(callback) {
                 var dateText = isDate ? dateMatch[0] : text;
                 var labelText = "";
                 var isException = false;
-                
-                // Check against static ignored dates list
-                if (IGNORED_DATES.indexOf(dateText.toUpperCase()) !== -1) {
-                    isException = true;
-                }
                 
                 var tr = el.closest('tr');
                 var card = el.closest('.card');
@@ -109,7 +105,7 @@ window.runLicenseChecker = function(callback) {
                 if (!labelText) labelText = "Qualification";
                 labelText = labelText.replace(/\s+/g, ' ');
 
-                // If flagged as an exception by column rule, class filter, or ignored dates, skip processing
+                // If flagged as an exception by column rule or class filter, skip processing
                 if (isException) continue;
 
                 var status = "VALID";
