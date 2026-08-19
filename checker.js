@@ -58,24 +58,28 @@ window.runLicenseChecker = function(callback) {
                 if (tr) {
                     var tds = tr.querySelectorAll('td');
                     
-                    // --- EXCEPTION RULES ---
+                    // --- EXCLUSION FILTERS ---
                     
-                    // 1. Ignore "7 December 1944" or any row starting with numbering "VIII"
-                    var numberingTd = tr.querySelector('.licenceNumbering');
-                    if (numberingTd && numberingTd.textContent.trim() === 'VIII') {
+                    // 1. Statutory / Footer / Historical Text Exclusion (e.g., Chicago Convention 1944 row)
+                    var rowText = tr.textContent.toUpperCase();
+                    if (tr.querySelector('.licenceNumbering') || 
+                        rowText.includes('CIVIL AVIATION ACT') || 
+                        rowText.includes('CONVENTION ON THE INTERNATIONAL CIVIL AVIATION')) {
                         isException = true;
                     }
 
-                    // 2. Strict Column 1 (Issue Date) exclusion if not explicitly red
-                    if (tds.length >= 3) {
+                    // 2. Column 1 (Issue Date) Exclusion
+                    if (!isException && tds.length >= 3) {
                         var targetTd = el.closest('td');
                         var colIndex = Array.prototype.indexOf.call(tds, targetTd);
+                        
+                        // If it's in the 2nd column (index 1 / Issue Date) and NOT explicitly red, ignore it entirely
                         if (colIndex === 1 && !isRed) {
                             isException = true;
                         }
                     }
 
-                    var rowNormalized = tr.textContent.toUpperCase().replace(/\s+/g, '');
+                    var rowNormalized = rowText.replace(/\s+/g, '');
                     if (rowNormalized.includes('CLASS1(SC)') || rowNormalized.includes('CLASS1SC')) {
                         isException = true;
                     } else if (!isException) {
