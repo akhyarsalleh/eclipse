@@ -1,6 +1,14 @@
 window.runLicenseChecker = function(callback) {
     // --- CONFIGURATION ---
     var WARNING_DAYS = 14; // Alert if expiring within this many days
+
+    // Static dates to completely ignore
+    var IGNORED_DATES = [
+        '07 DEC 1944',
+        '07/12/1944',
+        '07 DECEMBER 1944',
+        '7 DECEMBER 1944'
+    ];
     // ---------------------
 
     var existingOverlay = document.getElementById('license-checker-overlay');
@@ -52,6 +60,11 @@ window.runLicenseChecker = function(callback) {
                 var labelText = "";
                 var isException = false;
                 
+                // Check against static ignored dates list
+                if (IGNORED_DATES.indexOf(dateText.toUpperCase()) !== -1) {
+                    isException = true;
+                }
+                
                 var tr = el.closest('tr');
                 var card = el.closest('.card');
                 
@@ -96,7 +109,7 @@ window.runLicenseChecker = function(callback) {
                 if (!labelText) labelText = "Qualification";
                 labelText = labelText.replace(/\s+/g, ' ');
 
-                // If flagged as an exception by column rule or class filter, skip processing
+                // If flagged as an exception by column rule, class filter, or ignored dates, skip processing
                 if (isException) continue;
 
                 var status = "VALID";
