@@ -165,8 +165,8 @@ window.runLicenseChecker = function(callback) {
                     }
                 }
 
-                // 3. Ignore timestamp strings
-                if (/\b\d{1,2}:\d{2}(:\d{2})?\b/.test(text)) {
+                // 3. Ignore date strings containing time components (HH:mm:ss or HH:mm)
+                if (/\b\d{1,2}:\d{2}(:\d{2})?\b/.test(text) || /\b\d{1,2}:\d{2}(:\d{2})?\b/.test(immediateContext)) {
                     isException = true;
                 }
 
