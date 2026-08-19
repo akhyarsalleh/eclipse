@@ -14,13 +14,8 @@ window.runLicenseChecker = function(callback) {
         'TARIKH KELUARAN', 'TARIKH DIKELUARKAN', 'TARIKH ISU'
     ];
 
-    var EXPIRY_DATE_KEYWORDS = [
-        'VALIDITY EXPIRY DATE', 'EXPIRY DATE', 'DATE OF EXPIRY',
-        'TARIKH LUPUT', 'TARIKH TAMAT', 'VALID UNTIL'
-    ];
-
     var IGNORED_DATES = [
-        '01 JAN 1900',
+        '7 December 1944',
         '00/00/0000'
     ];
     // ---------------------------------------
@@ -28,7 +23,7 @@ window.runLicenseChecker = function(callback) {
     var existingOverlay = document.getElementById('license-checker-overlay');
     if (existingOverlay) existingOverlay.remove();
 
-    // Robust Date parsing for cross-browser / Safari compatibility
+    // Cross-browser/Safari safe date parser
     function parseCustomDate(dateStr) {
         var m = dateStr.match(/(\d{1,2})\s+([A-Za-z]{3,})\s+(\d{4})/);
         if (!m) return null;
@@ -67,7 +62,6 @@ window.runLicenseChecker = function(callback) {
         return false;
     }
 
-    // Resolves the associated <thead> column title for any given <td> cell
     function getColumnHeader(el) {
         var td = el.closest('td, th');
         if (!td) return '';
@@ -85,7 +79,6 @@ window.runLicenseChecker = function(callback) {
         return '';
     }
 
-    // Gets licence descriptor from column 1 (e.g. CPL(A))
     function getRowLeadLabel(el) {
         var td = el.closest('td, th');
         if (!td) return '';
@@ -100,20 +93,8 @@ window.runLicenseChecker = function(callback) {
         return '';
     }
 
-    function findLabelText(el, colHeader) {
-        var isExpiryCol = false;
-        for (var e = 0; e < EXPIRY_DATE_KEYWORDS.length; e++) {
-            if (colHeader.includes(EXPIRY_DATE_KEYWORDS[e])) {
-                isExpiryCol = true;
-                break;
-            }
-        }
-
+    function findLabelText(el) {
         var leadLabel = getRowLeadLabel(el);
-        if (isExpiryCol) {
-            return leadLabel ? 'Certificate of Validity (' + leadLabel + ')' : 'Certificate of Validity';
-        }
-
         if (leadLabel) return leadLabel;
 
         var tr = el.closest('tr');
@@ -125,6 +106,14 @@ window.runLicenseChecker = function(callback) {
                     return txt.replace('•', '').trim();
                 }
             }
+        }
+
+        var card = el.closest('.card');
+        if (card) {
+            var titleEl = card.querySelector('.col-sm-12 .bg-gray-300') || 
+                          card.querySelector('div[style*="font-weight: 500"]') || 
+                          card.querySelector('.fs-5');
+            if (titleEl) return titleEl.textContent.trim();
         }
         return "Qualification";
     }
@@ -165,7 +154,7 @@ window.runLicenseChecker = function(callback) {
                     }
                 }
 
-                // 2. Field keyword check (Date of Birth, etc.)
+                // 2. Field keyword check
                 if (!isException) {
                     for (var k = 0; k < IGNORED_FIELD_KEYWORDS.length; k++) {
                         var kw = IGNORED_FIELD_KEYWORDS[k];
@@ -187,7 +176,7 @@ window.runLicenseChecker = function(callback) {
                 }
 
                 if (!isException) {
-                    var labelText = findLabelText(el, colHeader);
+                    var labelText = findLabelText(el);
                     labelText = labelText.replace(/\s+/g, ' ');
                     var status = "VALID";
                     
