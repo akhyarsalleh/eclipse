@@ -15,8 +15,8 @@ window.runLicenseChecker = function(callback) {
     ];
 
     var IGNORED_DATES = [
-        '7 December 1944',
-        '00/00/0000'
+        '07 DEC 1944',
+        '07/12/1944'
     ];
     // ---------------------------------------
 
