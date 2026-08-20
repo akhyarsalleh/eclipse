@@ -449,7 +449,8 @@ window.runLicenseChecker = function(callback, daysThreshold) {
             if (item.daysRemaining === 1) {
                 daysText = " (1 day left)";
             }
-            expiringSoonDisplayList.push("<b>" + item.name + "</b> : " + item.dateText + " <span style='color: #ea580c; font-weight: bold;'>" + daysText + "</span><br>");
+            //expiringSoonDisplayList.push("<b>" + item.name + "</b> : " + item.dateText + " <span style='color: #ea580c; font-weight: bold;'>" + daysText + "</span><br>");
+            expiringSoonDisplayList.push( item.name + " : <b>" + item.dateText + "</b> <span style='color: #ea580c; font-weight: bold;'>" + daysText + "</span><br>");
         }
     }
 
@@ -520,7 +521,7 @@ window.runLicenseChecker = function(callback, daysThreshold) {
             titleColor: '#c2410c',
             titleText: 'Qualification Expiring Soon',
             tagBg: '#f97316',
-            tagText: 'PROCEED WITH CAUTION!',
+            tagText: 'FLY WITH CAUTION!',
             detailsText: "<span style='text-decoration: underline; text-underline-offset: 6px; display: inline-block; margin-bottom: 10px;'><b> EXPIRING SOON </b></span><br>" + expiringSoonDisplayList.join('')
         };
     } else {
