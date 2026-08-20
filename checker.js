@@ -499,9 +499,9 @@ window.runLicenseChecker = function(callback, daysThreshold) {
     if (expiredDisplayList.length > 0) {
         // Red critical state
         //var detailsHTML = "<b>[ EXPIRED CREDENTIALS ]</b><br>" + expiredDisplayList.join('');
-        var detailsHTML = "<span style='text-decoration: underline; text-underline-offset: 6px; display: inline-block; margin-bottom: 10px;'><b> EXPIRED CREDENTIALS </b></span><br>" + expiredDisplayList.join('');
+        var detailsHTML = "<span style='text-decoration: underline; text-underline-offset: 6px; display: inline-block; margin-bottom: 10px;'><b> EXPIRED CREDENTIALS </b></span><br>" + expiredDisplayList.join('\n');
         if (expiringSoonDisplayList.length > 0) {
-            detailsHTML += "<br><span style='text-decoration: underline; text-underline-offset: 6px; display: inline-block; margin-bottom: 10px;'><b> EXPIRING SOON </b></span><br>" + expiringSoonDisplayList.join('');
+            detailsHTML += "<br><span style='text-decoration: underline; text-underline-offset: 6px; display: inline-block; margin-bottom: 10px;'><b> EXPIRING SOON </b></span><br>" + expiringSoonDisplayList.join('\n');
         }
         statusConfig = {
             overlayBg: 'rgba(235, 50, 35, 0.35)',
@@ -523,7 +523,7 @@ window.runLicenseChecker = function(callback, daysThreshold) {
             titleText: 'Qualification Expiring Soon',
             tagBg: '#f97316',
             tagText: 'FLY WITH CAUTION!',
-            detailsText: "<span style='text-decoration: underline; text-underline-offset: 6px; display: inline-block; margin-bottom: 10px;'><b> EXPIRING SOON </b></span><br>" + expiringSoonDisplayList.join('')
+            detailsText: "<span style='text-decoration: underline; text-underline-offset: 6px; display: inline-block; margin-bottom: 10px;'><b> EXPIRING SOON </b></span><br>" + expiringSoonDisplayList.join('\n')
         };
     } else {
         // Green valid state
