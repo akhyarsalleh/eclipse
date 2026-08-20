@@ -1,6 +1,6 @@
 //--------------------------- //
-// ECLIPSE LICENCE CHECKER - ENHANCED VERSION 4.0 //
-// Version: 4.0 / Rel: 08/26 //
+// ECLIPSE LICENCE CHECKER - ENHANCED VERSION 8.0 //
+// Version: 8.0 / Rel: 08/26 //
 // AUTHOR: MOHD SALLEHUDDIN ZAIDY (Enhanced by Gemini Notebook) //
 //--------------------------- //
 
@@ -63,7 +63,7 @@ window.runLicenseChecker = function(callback, daysThreshold) {
 
     // Helper: Finds the first non-date, non-empty text cell in a row to use as the qualification name
     function getLabelFromRow(tr) {
-        var tds = tr.querySelectorAll('td');
+        var tds = tr.cells || tr.querySelectorAll('td');
         for (var i = 0; i < tds.length; i++) {
             var text = tds[i].textContent.replace('•', '').trim();
             if (!text) continue;
@@ -156,7 +156,7 @@ window.runLicenseChecker = function(callback, daysThreshold) {
                 return true; // Ignore the header row itself
             }
             
-            var tds = tr.querySelectorAll('td');
+            var tds = tr.cells || tr.querySelectorAll('td');
             if (tds.length === 3) {
                 // Check if this table actually has a "Validity Issue Date" header
                 var table = tr.closest('table');
@@ -299,7 +299,7 @@ window.runLicenseChecker = function(callback, daysThreshold) {
         var labelText = getLabelFromRow(tr);
         if (!labelText) continue;
         
-        var tds = tr.querySelectorAll('td');
+        var tds = tr.cells || tr.querySelectorAll('td');
         
         // Search inside row cells for any text that matches a date pattern or NO EXPIRY
         for (var j = 0; j < tds.length; j++) {
@@ -335,10 +335,7 @@ window.runLicenseChecker = function(callback, daysThreshold) {
                     var rowNormalized = tr.textContent.toUpperCase().replace(/\s+/g, '');
                     if (rowNormalized.indexOf('CLASS1(SC)') !== -1 || rowNormalized.indexOf('CLASS1SC') !== -1 || rowNormalized.indexOf('CLASS1(S.C.)') !== -1) continue;
                     
-                    var labelTd = tr.querySelector('.text-left') || tr.querySelector('td');
-                    if (labelTd) {
-                        labelText = labelTd.textContent.replace('•', '').trim();
-                    }
+                    labelText = getLabelFromRow(tr);
                 } else if (card) {
                     var cardNormalized = card.textContent.toUpperCase().replace(/\s+/g, '');
                     if (cardNormalized.indexOf('CLASS1(SC)') !== -1 || cardNormalized.indexOf('CLASS1SC') !== -1 || cardNormalized.indexOf('CLASS1(S.C.)') !== -1) continue;
