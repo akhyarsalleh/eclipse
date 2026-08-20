@@ -497,7 +497,7 @@ window.runLicenseChecker = function(callback, daysThreshold) {
     if (expiredDisplayList.length > 0) {
         // Red critical state
         //var detailsHTML = "<b>[ EXPIRED CREDENTIALS ]</b><br>" + expiredDisplayList.join('');
-        var detailsHTML = "<span style='font-weight: bold; color: white; background: black;'> EXPIRED CREDENTIALS </span><br>" + expiredDisplayList.join('');
+        var detailsHTML = "<span style='font-weight: bold; color: white; background: #2c3e50; padding: 2px 5px;'> EXPIRED CREDENTIALS </span><br>" + expiredDisplayList.join('');
         if (expiringSoonDisplayList.length > 0) {
             detailsHTML += "<br><b>[ EXPIRING SOON ]</b><br>" + expiringSoonDisplayList.join('');
         }
