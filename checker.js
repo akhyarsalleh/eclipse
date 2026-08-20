@@ -41,7 +41,7 @@ window.runLicenseChecker = function(callback, daysThreshold) {
         }
         
         // Regex to match "DD MMM YYYY" format
-        var match = trimmed.match(/^(\\d{1,2})\\s+([a-zA-Z]{3,10})\\s+(\\d{4})$/);
+        var match = trimmed.match(/^(\d{1,2})\s+([a-zA-Z]{3,10})\s+(\d{4})$/);
         if (!match) return null;
         
         var day = parseInt(match[1], 10);
@@ -513,4 +513,3 @@ window.runLicenseChecker = function(callback, daysThreshold) {
         console.log('Expired items:', rawExpiredNames);
     }
 };
-
