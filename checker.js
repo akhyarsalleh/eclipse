@@ -295,6 +295,14 @@ window.runLicenseChecker = function(callback, daysThreshold) {
     for (var i = 0; i < cards.length; i++) {
         var card = cards[i];
         var cardText = card.textContent.toUpperCase();
+        
+        // CRITICAL FIX: Skip outer layout cards (which contain tables processed by Pass 2)
+        if (cardText.indexOf('MEDICAL EXPIRY DATE') !== -1 || 
+            cardText.indexOf('TARIKH TAMAT TEMPOH PERUBATAN') !== -1 ||
+            cardText.indexOf('LICENCE TYPE') !== -1 ||
+            cardText.indexOf('VALIDITY EXPIRY DATE') !== -1) {
+            continue;
+        }
         var cardNormalized = cardText.replace(/\s+/g, ''); if (cardNormalized.indexOf('CLASS1(SC)') !== -1 || cardNormalized.indexOf('CLASS1SC') !== -1 || cardNormalized.indexOf('CLASS1(S.C.)') !== -1) continue;
         
         var titleEl = card.querySelector('.col-sm-12 .bg-gray-300') || 
@@ -325,7 +333,11 @@ window.runLicenseChecker = function(callback, daysThreshold) {
         var tr = rows[i];
         var rowText = tr.textContent.toUpperCase();
         var rowNormalized = rowText.replace(/\s+/g, ''); if (rowNormalized.indexOf('CLASS1(SC)') !== -1 || rowNormalized.indexOf('CLASS1SC') !== -1 || rowNormalized.indexOf('CLASS1(S.C.)') !== -1) continue;
-        if (rowText.indexOf('LICENCE TYPE') !== -1 || rowText.indexOf('VALIDITY EXPIRY DATE') !== -1) continue; // Skip header
+        
+        // CRITICAL FIX: Skip header rows and outer table structures
+        if (rowText.indexOf('LICENCE TYPE') !== -1 || rowText.indexOf('VALIDITY EXPIRY DATE') !== -1) continue; // Skip FCL header
+        if (rowText.indexOf('MEDICAL CLASS') !== -1 || rowText.indexOf('KELAS PERUBATAN') !== -1) continue;     // Skip Medical header
+        if (rowText.indexOf('MEDICAL EXPIRY DATE') !== -1 || rowText.indexOf('TARIKH TAMAT TEMPOH PERUBATAN') !== -1) continue; // Skip Medical layout row
         
         var labelText = getLabelFromRow(tr);
         if (!labelText) continue;
