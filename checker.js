@@ -134,8 +134,18 @@ window.runLicenseChecker = function(callback, daysThreshold) {
             // CRITICAL FIX: Check and break at table container levels BEFORE evaluating aggregated text content.
             // This prevents reading texts of other rows (like DOB, signatures, sync dates) inside giant layout tables.
             var tagName = curr.tagName.toUpperCase();
-            if (tagName === 'TABLE' || tagName === 'TBODY' || tagName === 'THEAD' || tagName === 'BODY' || tagName === 'HTML') {
+            if (tagName === 'TABLE' || tagName === 'TBODY' || tagName === 'THEAD' || tagName === 'BODY' || tagName === 'HTML' || tagName === 'TR' || tagName === 'TFOOT') {
                 break;
+            }
+            
+            if (tagName === 'DIV') {
+                var className = (curr.className || '').toLowerCase();
+                if (className.indexOf('row') !== -1 || 
+                    className.indexOf('container') !== -1 || 
+                    className.indexOf('col-') !== -1 || 
+                    className.indexOf('card') !== -1) {
+                    break;
+                }
             }
             
             var currText = curr.textContent.toUpperCase();
