@@ -119,6 +119,13 @@ window.runLicenseChecker = function(callback, daysThreshold) {
                 return true;
             }
             
+            // Stop climbing AFTER checking this element if it's a table-level element or body/html
+            // This prevents reading text from massive outer layout tables that contain other unrelated sections (e.g. sync date, signatures)
+            var tagName = curr.tagName.toUpperCase();
+            if (tagName === 'TABLE' || tagName === 'TBODY' || tagName === 'THEAD' || tagName === 'BODY' || tagName === 'HTML') {
+                break;
+            }
+            
             curr = curr.parentElement;
         }
         
