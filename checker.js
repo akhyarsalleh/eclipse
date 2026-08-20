@@ -32,6 +32,21 @@ window.runLicenseChecker = function(callback, daysThreshold) {
 
     // --- Date Parsing Helper Functions ---
     
+
+    // Helper: Checks if an element is nested under an element with id="pg2"
+    function isUnderPg2(el) {
+        if (!el) return false;
+        if (typeof el.closest === 'function') {
+            return el.closest('#pg2') !== null;
+        }
+        var curr = el;
+        while (curr) {
+            if (curr.id === 'pg2') return true;
+            curr = curr.parentElement;
+        }
+        return false;
+    }
+
     // Parses date strings in 'DD MMM YYYY' format (e.g., '31 JUL 2027', '31 Jul 2027')
     function parseLicenseDate(dateStr) {
         if (!dateStr) return null;
@@ -101,6 +116,7 @@ window.runLicenseChecker = function(callback, daysThreshold) {
     // --- Rule-Based Filter Function (to ignore non-qualification dates) ---
     function shouldIgnore(el) {
         if (!el) return true;
+        if (isUnderPg2(el)) return true; // Skip elements under pg2
         
         var text = el.textContent.trim();
         if (!text) return true;
@@ -294,6 +310,7 @@ window.runLicenseChecker = function(callback, daysThreshold) {
     var cards = document.querySelectorAll('.card');
     for (var i = 0; i < cards.length; i++) {
         var card = cards[i];
+        if (isUnderPg2(card)) continue; // Skip cards under pg2
         var cardText = card.textContent.toUpperCase();
         
         // CRITICAL FIX: Skip outer layout cards (which contain tables processed by Pass 2)
@@ -331,6 +348,7 @@ window.runLicenseChecker = function(callback, daysThreshold) {
     var rows = document.querySelectorAll('tr');
     for (var i = 0; i < rows.length; i++) {
         var tr = rows[i];
+        if (isUnderPg2(tr)) continue; // Skip rows under pg2
         var rowText = tr.textContent.toUpperCase();
         var rowNormalized = rowText.replace(/\s+/g, ''); if (rowNormalized.indexOf('CLASS1(SC)') !== -1 || rowNormalized.indexOf('CLASS1SC') !== -1 || rowNormalized.indexOf('CLASS1(S.C.)') !== -1) continue;
         
@@ -366,6 +384,7 @@ window.runLicenseChecker = function(callback, daysThreshold) {
     var elements = document.querySelectorAll('b, span, td, div, p, font, strong');
     for (var i = 0; i < elements.length; i++) {
         var el = elements[i];
+        if (isUnderPg2(el)) continue; // Skip elements under pg2
         if (el.children.length === 0 && el.textContent.trim().length > 0) {
             if (shouldIgnore(el)) continue;
             if (isRedOrExpired(el)) {
