@@ -441,7 +441,8 @@ window.runLicenseChecker = function(callback, daysThreshold) {
     for (var k in qualificationData) {
         var item = qualificationData[k];
         if (item.status === "EXPIRED") {
-            expiredDisplayList.push("<b>" + item.name + "</b> : " + item.dateText + " <span style='color: #ef4444; font-weight: bold;'>(EXPIRED)</span><br>");
+            //expiredDisplayList.push("<b>" + item.name + "</b> : " + item.dateText + " <span style='color: #ef4444; font-weight: bold;'>(EXPIRED)</span><br>");
+            expiredDisplayList.push( item.name + " : <b>" + item.dateText + "</b> <span style='color: #ef4444; font-weight: bold;'>(EXPIRED)</span><br>");
             rawExpiredNames.push(item.name + " : " + item.dateText);
         } else if (item.status === "EXPIRING_SOON") {
             // Enhanced "Expiring Soon" formatting with "(X days left)"
