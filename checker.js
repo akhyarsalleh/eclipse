@@ -61,6 +61,22 @@ window.runLicenseChecker = function(callback, daysThreshold) {
         return new Date(year, monthIdx, day);
     }
 
+    // Helper: Finds the first non-date, non-empty text cell in a row to use as the qualification name
+    function getLabelFromRow(tr) {
+        var tds = tr.querySelectorAll('td');
+        for (var i = 0; i < tds.length; i++) {
+            var text = tds[i].textContent.replace('•', '').trim();
+            if (!text) continue;
+            
+            // Check if it matches a date pattern or 'NO EXPIRY'
+            var isDatePattern = /^\d{1,2}\s+[a-zA-Z]{3,10}\s+\d{4}$/.test(text) || text.toUpperCase() === 'NO EXPIRY';
+            if (!isDatePattern) {
+                return text;
+            }
+        }
+        return "";
+    }
+
     // --- Rule-Based Filter Function (to ignore non-qualification dates) ---
     function shouldIgnore(el) {
         if (!el) return true;
@@ -142,8 +158,18 @@ window.runLicenseChecker = function(callback, daysThreshold) {
             
             var tds = tr.querySelectorAll('td');
             if (tds.length === 3) {
-                // tds[1] is the "Validity Issue Date" column
-                if (tds[1] === el || tds[1].contains(el)) {
+                // Check if this table actually has a "Validity Issue Date" header
+                var table = tr.closest('table');
+                var hasIssueDateHeader = false;
+                if (table) {
+                    var tableText = table.textContent.toUpperCase();
+                    if (tableText.indexOf("VALIDITY ISSUE DATE") !== -1 || tableText.indexOf("TARIKH KELUARAN") !== -1) {
+                        hasIssueDateHeader = true;
+                    }
+                }
+                
+                // If it does have that header, then tds[1] is indeed the "Validity Issue Date" column
+                if (hasIssueDateHeader && (tds[1] === el || tds[1].contains(el))) {
                     return true;
                 }
             }
@@ -270,10 +296,9 @@ window.runLicenseChecker = function(callback, daysThreshold) {
         if (rowText.indexOf('CLASS1(SC)') !== -1 || rowText.indexOf('CLASS1SC') !== -1 || rowText.indexOf('CLASS1(S.C.)') !== -1) continue;
         if (rowText.indexOf('LICENCE TYPE') !== -1 || rowText.indexOf('VALIDITY EXPIRY DATE') !== -1) continue; // Skip header
         
-        var labelTd = tr.querySelector('.text-left') || tr.querySelector('td');
-        if (!labelTd) continue;
+        var labelText = getLabelFromRow(tr);
+        if (!labelText) continue;
         
-        var labelText = labelTd.textContent.replace('•', '').trim();
         var tds = tr.querySelectorAll('td');
         
         // Search inside row cells for any text that matches a date pattern or NO EXPIRY
@@ -281,7 +306,7 @@ window.runLicenseChecker = function(callback, daysThreshold) {
             var tdText = tds[j].textContent.trim();
             var isDatePattern = /^\d{1,2}\s+[a-zA-Z]{3,10}\s+\d{4}$/.test(tdText) || tdText.toUpperCase() === 'NO EXPIRY';
             
-            if (isDatePattern && labelText) {
+            if (isDatePattern) {
                 if (shouldIgnore(tds[j])) continue;
                 var key = labelText.toUpperCase().replace(/\s+/g, '');
                 processedKeys[key] = true;
@@ -290,7 +315,6 @@ window.runLicenseChecker = function(callback, daysThreshold) {
                 var isVisExpired = isRedOrExpired(tds[j]) || isRedOrExpired(tr) || rowText.indexOf('EXPIRED') !== -1;
                 
                 processQualification(labelText, tdText, parsedDate, isVisExpired);
-                break; // Handled this row
             }
         }
     }
