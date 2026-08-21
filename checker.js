@@ -499,16 +499,16 @@ window.runLicenseChecker = function(callback, daysThreshold) {
     if (expiredDisplayList.length > 0) {
         // Red critical state
         //var detailsHTML = "<b>[ EXPIRED CREDENTIALS ]</b><br>" + expiredDisplayList.join('');
-        var detailsHTML = "<span style='text-decoration: underline; text-underline-offset: 6px; display: inline-block; margin-bottom: 10px;'><b> EXPIRED VALIDITY </b></span><br>" + expiredDisplayList.join('\n');
+        var detailsHTML = "<span style='text-decoration: underline; text-underline-offset: 6px; display: inline-block; margin-bottom: 10px;'><b> EXPIRED VALIDITY </b></span><br>" + expiredDisplayList.join('');
         if (expiringSoonDisplayList.length > 0) {
-            detailsHTML += "<br><span style='text-decoration: underline; text-underline-offset: 6px; display: inline-block; margin-bottom: 10px;'><b> EXPIRING SOON </b></span><br>" + expiringSoonDisplayList.join('\n');
+            detailsHTML += "<br><span style='text-decoration: underline; text-underline-offset: 6px; display: inline-block; margin-bottom: 10px;'><b> EXPIRING SOON </b></span><br>" + expiringSoonDisplayList.join('');
         }
         statusConfig = {
             overlayBg: 'rgba(235, 50, 35, 0.35)',
             badgeBg: '#ef4444',
             icon: '!',
             titleColor: '#d32f2f',
-            titleText: 'Qualification Expired / Invalid',
+            titleText: 'Validity Expired / Invalid',
             tagBg: '#ef4444',
             tagText: 'DO NOT FLY!',
             detailsText: detailsHTML
