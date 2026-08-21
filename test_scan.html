@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eclipse License Scanner Portal</title>
+    <!-- 1. Load the lightweight, cross-platform HTML5-QRCode Scanner Library -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f1f5f9;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            max-width: 480px;
+            width: 100%;
+            background: #ffffff;
+            padding: 24px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            text-align: center;
+            box-sizing: border-box;
+        }
+        h1 {
+            font-size: 20px;
+            color: #0f172a;
+            margin-bottom: 8px;
+        }
+        p {
+            font-size: 14px;
+            color: #64748b;
+            margin-bottom: 24px;
+        }
+        #reader {
+            width: 100%;
+            border-radius: 12px;
+            overflow: hidden;
+            border: none !important;
+            background-color: #000;
+        }
+        .status-box {
+            margin-top: 20px;
+            padding: 12px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #475569;
+            background-color: #f8fafc;
+            border-radius: 8px;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Eclipse License Scanner</h1>
+    <p>Point your camera at the CAAM Digital License QR code to automatically check validation status.</p>
+    
+    <!-- Camera stream displays here -->
+    <div id="reader"></div>
+    
+    <div id="status" class="status-box">Status: Ready to scan...</div>
+</div>
+
+<script>
+    function onScanSuccess(decodedText, decodedResult) {
+        // Stop scanning once a code is matched
+        html5QrcodeScanner.clear().then(_ => {
+            var statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = "<b>QR Detected!</b> Processing URL...";
+            
+            // Verify if the scanned URL belongs to the official CAAM portal
+            if (decodedText.indexOf("eclipse.caam.gov.my") !== -1) {
+                statusDiv.style.color = "#16a34a";
+                statusDiv.innerHTML = "<b>Redirecting...</b> Fetching secure license data.";
+                
+                // --- PASS URL TO THE NEXT STEP ---
+                // Trigger your backend proxy and execute your checker-v12.js algorithm [3]
+                processLicenseUrl(decodedText);
+            } else {
+                statusDiv.style.color = "#dc2626";
+                statusDiv.innerHTML = "<b>Error:</b> Invalid QR Code. Must be a CAAM Digital License.";
+                // Restart scanner if invalid
+                startScanner();
+            }
+        }).catch(err => {
+            console.warn("Failed to clear scanner", err);
+        });
+    }
+
+    function processLicenseUrl(caamUrl) {
+        // Enforce Cache-Bust & redirect to your CORS proxy endpoint
+        const proxyBaseUrl = "https://your-serverless-proxy.vercel.app/api/fetch"; 
+        const targetUrl = proxyBaseUrl + "?licenseUrl=" + encodeURIComponent(caamUrl);
+        
+        // Redirect or fetch directly in the background
+        window.location.href = targetUrl;
+    }
+
+    function startScanner() {
+        html5QrcodeScanner.render(onScanSuccess, (errorMessage) => {
+            // Silence verbose live-stream decoding errors in console
+        });
+    }
+
+    // 2. Configure the QR Reader
+    const html5QrcodeScanner = new Html5QrcodeScanner(
+        "reader", 
+        { 
+            fps: 15, 
+            qrbox: { width: 250, height: 250 },
+            // Prefers user's primary rear camera facing away
+            supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
+        }
+    );
+
+    // 3. Launch Scanner on load
+    startScanner();
+</script>
+
+</body>
+</html>
