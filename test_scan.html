@@ -58,7 +58,7 @@
 <body>
 
 <div class="container">
-    <h1>Eclipse License Scanner</h1>
+    <h1>Eclipse License Checker</h1>
     <p>Point your camera at the CAAM Digital License QR code to automatically check validation status.</p>
     
     <!-- Camera stream displays here -->
@@ -68,59 +68,65 @@
 </div>
 
 <script>
+    // 1. Initialize the raw HTML5 QR Code engine on your target element
+    // Using Html5Qrcode instead of Html5QrcodeScanner bypasses all default library UI elements.
+    const html5QrCode = new Html5Qrcode("reader");
+    
+    const qrConfig = { 
+        fps: 15, 
+        qrbox: { width: 250, height: 250 } 
+    };
+
     function onScanSuccess(decodedText, decodedResult) {
-        // Stop scanning once a code is matched
-        html5QrcodeScanner.clear().then(_ => {
+        // Stop scanning programmatically once a match is found
+        html5QrCode.stop().then(() => {
             var statusDiv = document.getElementById('status');
             statusDiv.innerHTML = "<b>QR Detected!</b> Processing URL...";
             
-            // Verify if the scanned URL belongs to the official CAAM portal
             if (decodedText.indexOf("eclipse.caam.gov.my") !== -1) {
                 statusDiv.style.color = "#16a34a";
                 statusDiv.innerHTML = "<b>Redirecting...</b> Fetching secure license data.";
-                
-                // --- PASS URL TO THE NEXT STEP ---
-                // Trigger your backend proxy and execute your checker-v12.js algorithm [3]
                 processLicenseUrl(decodedText);
             } else {
                 statusDiv.style.color = "#dc2626";
                 statusDiv.innerHTML = "<b>Error:</b> Invalid QR Code. Must be a CAAM Digital License.";
                 // Restart scanner if invalid
-                startScanner();
+                setTimeout(startScanner, 2000);
             }
         }).catch(err => {
-            console.warn("Failed to clear scanner", err);
+            console.warn("Failed to stop scanner", err);
         });
     }
 
     function processLicenseUrl(caamUrl) {
-        // Enforce Cache-Bust & redirect to your CORS proxy endpoint
+        // Enforce Cache-Bust & redirect to your serverless CORS proxy endpoint
         const proxyBaseUrl = "https://your-serverless-proxy.vercel.app/api/fetch"; 
         const targetUrl = proxyBaseUrl + "?licenseUrl=" + encodeURIComponent(caamUrl);
-        
-        // Redirect or fetch directly in the background
         window.location.href = targetUrl;
     }
 
     function startScanner() {
-        html5QrcodeScanner.render(onScanSuccess, (errorMessage) => {
-            // Silence verbose live-stream decoding errors in console
+        var statusDiv = document.getElementById('status');
+        statusDiv.style.color = "#475569";
+        statusDiv.innerText = "Status: Initializing back camera...";
+
+        // programmatically launch the camera using 'facingMode: "environment"'
+        // This forces both iOS Safari and Android Chrome to open the primary rear camera instantly.
+        html5QrCode.start(
+            { facingMode: "environment" }, 
+            qrConfig, 
+            onScanSuccess
+        ).then(() => {
+            statusDiv.innerText = "Status: Align QR code inside the frame.";
+        }).catch(err => {
+            statusDiv.style.color = "#dc2626";
+            statusDiv.innerText = "Camera Access Error: Please ensure camera permission is granted.";
+            console.error("Scanning start error:", err);
         });
     }
 
-    // 2. Configure the QR Reader
-    const html5QrcodeScanner = new Html5QrcodeScanner(
-        "reader", 
-        { 
-            fps: 15, 
-            qrbox: { width: 250, height: 250 },
-            // Prefers user's primary rear camera facing away
-            supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
-        }
-    );
-
-    // 3. Launch Scanner on load
-    startScanner();
+    // Launch the locked camera scanner automatically when the page loads
+    window.addEventListener("DOMContentLoaded", startScanner);
 </script>
 
 </body>
