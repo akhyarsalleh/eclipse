@@ -508,7 +508,7 @@ window.runLicenseChecker = function(callback, daysThreshold) {
             badgeBg: '#ef4444',
             icon: '!',
             titleColor: '#d32f2f',
-            titleText: 'Validity Expired / Invalid',
+            titleText: 'Qualification Expired / Invalid',
             tagBg: '#ef4444',
             tagText: 'DO NOT FLY!',
             detailsText: detailsHTML
@@ -535,7 +535,7 @@ window.runLicenseChecker = function(callback, daysThreshold) {
             titleText: 'All Qualifications Valid',
             tagBg: '#22c55e',
             tagText: 'HAVE A SAFE FLIGHT!',
-            detailsText: 'All checked licence qualifications are valid.'
+            detailsText: 'All licence qualifications are valid.'
         };
     }
 
