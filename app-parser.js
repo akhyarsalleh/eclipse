@@ -1,8 +1,10 @@
 // app-parser.js
 // Dedicated Parsing Engine for the Eclipse Web App Portal
+// Extracts Pilot Name, License No, and Validates Qualifications
+
 function parseAndBuildDashboard(html, THRESHOLD) {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, "text/html");
+    var parser = new DOMParser();
+    var doc = parser.parseFromString(html, "text/html");
 
     // Helper: Page 2 Isolation
     function isUnderPg2(el) {
@@ -16,7 +18,7 @@ function parseAndBuildDashboard(html, THRESHOLD) {
         return false;
     }
 
-    // Helper: Fetch direct children of row
+    // Helper: Fetch direct children of row (prevents nested layout bleeds)
     function getDirectChildCells(tr) {
         var cells = [];
         if (tr && tr.children) {
@@ -33,7 +35,7 @@ function parseAndBuildDashboard(html, THRESHOLD) {
         return cells;
     }
 
-    // Helper: Translate Date Formats
+    // Helper: Translate Date Formats (100% Corrected)
     function parseLicenseDate(dateStr) {
         if (!dateStr) return null;
         var trimmed = dateStr.trim();
@@ -42,9 +44,9 @@ function parseAndBuildDashboard(html, THRESHOLD) {
         var match = trimmed.match(/^(\d{1,2})\s+([a-zA-Z]{3,10})\s+(\d{4})$/);
         if (!match) return null;
         
-        var day = parseInt(match[10], 10);
-        var monthStr = match[11].toUpperCase(); 
-        var year = parseInt(match[12], 10);     
+        var day = parseInt(match[1], 10);
+        var monthStr = match[2].toUpperCase(); 
+        var year = parseInt(match[3], 10);     
         
         var months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
         var monthsMalay = ["JAN", "FEB", "MAC", "APR", "MEI", "JUN", "JUL", "OGOS", "SEP", "OKT", "NOV", "DIS"];
@@ -104,24 +106,101 @@ function parseAndBuildDashboard(html, THRESHOLD) {
     // --- Extractor Core ---
     var pilotName = "Unknown Pilot";
     var pilotLicense = "License No: -";
-    
+    var cells = doc.querySelectorAll('td, th, p, div, span, b, h1, h2, h3');
+
+    // 1. DOM-Based Name Extraction (Highly Reliable)
+    for (var i = 0; i < cells.length; i++) {
+        var text = cells[i].textContent.trim();
+        if (text.indexOf('Full Name of Holder') !== -1 || text.indexOf('Nama Penuh Pemegang') !== -1) {
+            // Table row check
+            var tr = cells[i].closest('tr');
+            if (tr) {
+                var nextTr = tr.nextElementSibling;
+                if (nextTr) {
+                    var nextCells = nextTr.querySelectorAll('td');
+                    if (nextCells.length > 0) {
+                        var nameCandidate = nextCells[nextCells.length - 1].textContent.trim();
+                        if (nameCandidate && nameCandidate.length > 2) {
+                            pilotName = nameCandidate;
+                            break;
+                        }
+                    }
+                }
+            }
+            // Sibling check
+            var parent = cells[i].parentElement;
+            if (parent) {
+                var parentText = parent.textContent.replace('Full Name of Holder', '').replace('(Nama Penuh Pemegang)', '').trim();
+                parentText = parentText.replace(/\s+/g, ' ').trim();
+                if (parentText && parentText.length > 2) {
+                    pilotName = parentText;
+                    break;
+                }
+            }
+        }
+    }
+
+    // 2. DOM-Based License Number Extraction
+    for (var i = 0; i < cells.length; i++) {
+        var text = cells[i].textContent.trim();
+        var match = text.match(/LICENCE\s*NO\.?\s*([A-Za-z0-9\/\-]+)/i);
+        if (match && match[1]) {
+            var val = match[1].trim();
+            if (val.toUpperCase() !== "NOMBOR" && val.toUpperCase() !== "NEW" && val.toUpperCase() !== "BARU" && val.length > 2) {
+                pilotLicense = "Licence No: " + val;
+                break;
+            }
+        }
+    }
+
+    if (pilotLicense === "License No: -") {
+        for (var i = 0; i < cells.length; i++) {
+            var text = cells[i].textContent.trim();
+            if (text.indexOf('Licence No') !== -1 || text.indexOf('Nombor Lesen') !== -1) {
+                var tr = cells[i].closest('tr');
+                if (tr) {
+                    var tds = tr.querySelectorAll('td');
+                    if (tds.length > 1) {
+                        for (var j = 0; j < tds.length; j++) {
+                            var val = tds[j].textContent.trim();
+                            if (/^[A-Za-z0-9\/]{3,15}$/.test(val) && val.toUpperCase() !== 'LICENCE NO' && val.indexOf('Nombor') === -1) {
+                                pilotLicense = "Licence No: " + val;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. Fallback: Flat Text Regex Engine
     var rawBodyText = doc.body.textContent;
     var bodyText = rawBodyText.replace(/\s+/g, ' ');
 
-    var nameMatch = bodyText.match(/Full Name of Holder\s*(?:\([^)]*\)\s*)*\s*\|*\s*\|*\s*([A-Za-z\s\.\'\-]+?)(?:\s+IVc|\s+Date of|\s*\||$)/i);
-    if (nameMatch && nameMatch[10]) {
-        pilotName = nameMatch[10].trim();
+    if (pilotName === "Unknown Pilot") {
+        var nameMatch = bodyText.match(/Full Name of Holder\s*(?:\([^)]*\)\s*)*\s*([A-Za-z\s\.\'\-]+?)(?:\s+(?:IVc|Date of Birth|Tarikh Lahir|Address|Alamat|Nationality|MALAYSIAN)|$)/i);
+        if (nameMatch && nameMatch[1]) {
+            pilotName = nameMatch[1].trim();
+        }
     }
 
-    var licMatch = bodyText.match(/LICENCE NO\s*(?:Nombor Lesen Baru\s*)?(\w+)/i);
-    if (licMatch && licMatch[10]) {
-        pilotLicense = "Licence No: " + licMatch[10].trim();
+    // Clean up name noise characters
+    pilotName = pilotName.replace(/^[|\|\s\-\.\'\#\:\*]+/, '').replace(/[|\|\s\-\.\'\#\:\*]+$/, '').trim();
+
+    if (pilotLicense === "License No: -") {
+        var licMatch = bodyText.match(/LICENCE\s*NO\s*(?:Nombor\s*Lesen\s*(?:Baru\s*)?)?\s*([A-Z0-9\/]+)/i) ||
+                       bodyText.match(/LICENCE\s*NO\s*:\s*([A-Z0-9\/]+)/i);
+        if (licMatch && licMatch[1]) {
+            pilotLicense = "Licence No: " + licMatch[1].trim();
+        }
     }
 
+    // Extract Qualifications
     var qualificationData = {};
     var refDate = new Date();
 
-    // Pass 1: Cards
+    // Pass 1: Card Components
     var cards = doc.querySelectorAll('.card');
     cards.forEach(card => {
         if (isUnderPg2(card)) return;
