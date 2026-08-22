@@ -1,16 +1,16 @@
-// app-parser-v2.js
-// Dedicated Parsing Engine for the Eclipse Web App Portal (Version 2.0)
+// app-parser.js
+// Dedicated Parsing Engine for the Eclipse Web App Portal
 // Extracts Pilot Name, License No, and Validates Qualifications
 
 function parseAndBuildDashboard(html, THRESHOLD) {
     var parser = new DOMParser();
     var doc = parser.parseFromString(html, "text/html");
 
-    // 1. CRITICAL SAFETY SWEEP: Remove scripts, styles, and SVGs immediately
-    // This completely prevents any raw inline JS/CSS/SVG code from leaking as text
-    var badElements = doc.querySelectorAll('script, style, svg, iframe, noscript');
-    for (var j = 0; j < badElements.length; j++) {
-        badElements[j].remove();
+    // 1. DOM SAFETY CLEANUP SWEEP
+    // Completely purges non-visible script, style, SVG, and metadata blocks to prevent text pollution
+    var scripts = doc.querySelectorAll('script, style, svg, noscript, iframe, link, meta');
+    for (var i = 0; i < scripts.length; i++) {
+        scripts[i].remove();
     }
 
     // Helper: Page 2 Isolation
@@ -87,9 +87,33 @@ function parseAndBuildDashboard(html, THRESHOLD) {
         if (!text) return true;
         var upperText = text.toUpperCase();
         
-        if (upperText.indexOf("INITIAL GRANT") !== -1 || /^\d{1,2}:\d{2}:\d{2}$/.test(text)) return true;
+        if (upperText.indexOf("INITIAL GRANT") !== -1 || /^\\d{1,2}:\\d{2}:\\d{2}$/.test(text)) return true;
         if (upperText.indexOf("7 DECEMBER 1944") !== -1 || upperText.indexOf("DECEMBER 1944") !== -1) return true;
         
+        // --- Table-Climbing Rule: Disregard "Validity Issue Date" in FCL tables ---
+        var tr = el.closest('tr');
+        if (tr) {
+            var rowText = tr.textContent.toUpperCase();
+            if (rowText.indexOf("VALIDITY ISSUE DATE") !== -1 || rowText.indexOf("TARIKH KELUARAN") !== -1) {
+                return true; // Ignore header
+            }
+            var tds = getDirectChildCells(tr);
+            if (tds.length === 3) {
+                var table = tr.closest('table');
+                var hasIssueDateHeader = false;
+                if (table) {
+                    var tableText = table.textContent.toUpperCase();
+                    if (tableText.indexOf("VALIDITY ISSUE DATE") !== -1 || tableText.indexOf("TARIKH KELUARAN") !== -1) {
+                        hasIssueDateHeader = true;
+                    }
+                }
+                // If the table contains "Validity Issue Date" header, column tds[1] is the Issue Date - IGNORE IT!
+                if (hasIssueDateHeader && (tds[1] === el || tds[1].contains(el))) {
+                    return true;
+                }
+            }
+        }
+
         var curr = el;
         for (var i = 0; i < 5; i++) {
             if (!curr) break;
@@ -113,25 +137,64 @@ function parseAndBuildDashboard(html, THRESHOLD) {
     // --- Extractor Core ---
     var pilotName = "Unknown Pilot";
     var pilotLicense = "License No: -";
+    var cells = doc.querySelectorAll('td, th, p, div, span, b, h1, h2, h3');
+
+    // 1. DOM-Based Name Extraction (Highly Reliable)
+    for (var i = 0; i < cells.length; i++) {
+        var text = cells[i].textContent.trim();
+        if (text.indexOf('Full Name of Holder') !== -1 || text.indexOf('Nama Penuh Pemegang') !== -1) {
+            // Table row check
+            var tr = cells[i].closest('tr');
+            if (tr) {
+                var nextTr = tr.nextElementSibling;
+                if (nextTr) {
+                    var nextCells = nextTr.querySelectorAll('td');
+                    if (nextCells.length > 0) {
+                        var nameCandidate = nextCells[nextCells.length - 1].textContent.trim();
+                        if (nameCandidate && nameCandidate.length > 2) {
+                            pilotName = nameCandidate;
+                            break;
+                        }
+                    }
+                }
+            }
+            // Sibling check
+            var parent = cells[i].parentElement;
+            if (parent) {
+                var parentText = parent.textContent.replace('Full Name of Holder', '').replace('(Nama Penuh Pemegang)', '').trim();
+                parentText = parentText.replace(/\s+/g, ' ').trim();
+                if (parentText && parentText.length > 2) {
+                    pilotName = parentText;
+                    break;
+                }
+            }
+        }
+    }
 
     // 2. Fetch body text completely cleaned of scripts, styles, and tags
     var rawBodyText = doc.body.textContent || "";
     var bodyText = rawBodyText.replace(/\s+/g, " ");
 
-    // 3. Resilient Name Extraction (100% accurate, ignores markup/table structures)
-    var nameMatch = bodyText.match(/Full Name of Holder\s*(?:\([^)]*\)\s*)*[^A-Za-z]*\s*([A-Za-z\s\.\'\-]+?)\s*[^A-Za-z]*\s*(?:\s+(?:IVc|Date of Birth|Tarikh Lahir|Address|Alamat|Nationality|MALAYSIAN)|$)/i);
-    if (nameMatch && nameMatch[1]) {
-        pilotName = nameMatch[1].trim();
-        // Trim standard trailing noise
-        pilotName = pilotName.replace(/^[|\|\s\-\.\'\#\:\*]+/, '').replace(/[|\|\s\-\.\'\#\:\*]+$/, '').trim();
+    // 3. Resilient Name Extraction Fallback
+    if (pilotName === "Unknown Pilot") {
+        var nameMatch = bodyText.match(/Full Name of Holder\s*(?:\([^)]*\)\s*)*[^A-Za-z]*\s*([A-Za-z\s\.\'\-]+?)\s*[^A-Za-z]*\s*(?:\s+(?:IVc|Date of Birth|Tarikh Lahir|Address|Alamat|Nationality|MALAYSIAN)|$)/i);
+        if (nameMatch && nameMatch[1]) {
+            pilotName = nameMatch[1].trim();
+        }
     }
 
-    // 4. Resilient License Number Extraction
-    var licMatch = bodyText.match(/LICENCE\s*NO\.?\s*[^A-Za-z0-9]*\s*([A-Za-z0-9\/\s\-]+?)(?:\s*[\(|\|]|\s{2,}|Nombor|Lesen|$)/i);
-    if (licMatch && licMatch[1]) {
-        var val = licMatch[1].trim();
-        val = val.replace(/^[|\|\s\-\.\'\#\:\*]+/, '').replace(/[|\|\s\-\.\'\#\:\*]+$/, '').trim();
-        if (val.toUpperCase() !== "NOMBOR" && val.toUpperCase() !== "NEW" && val.toUpperCase() !== "BARU" && val.length > 2) {
+    // Clean up name noise characters
+    pilotName = pilotName.replace(/^[|\|\s\-\.\'\#\:\*]+/, '').replace(/[|\|\s\-\.\'\#\:\*]+$/, '').trim();
+
+    // 4. Resilient License Number Extraction (Precision Section III match)
+    var licMatchIII = bodyText.match(/III\s+LICENCE\s+NO\s*([A-Z0-9\/\s\-]+?)\s*(?=\s*\(Nombor|$)/i);
+    var licMatchBackup = bodyText.match(/Licence\s*No\s*(?:Nombor\s*Lesen\s*(?:Baru|Lama)?)?\s*([A-Z0-9\/\s\-]+?)\s*(?=\s*(?:Old|Licence|Nombor|Lesen|IVa|XIc|$))/i);
+    
+    if (licMatchIII && licMatchIII[1] && licMatchIII[1].trim().length > 1) {
+        pilotLicense = "Licence No: " + licMatchIII[1].trim();
+    } else if (licMatchBackup && licMatchBackup[1] && licMatchBackup[1].trim().length > 1) {
+        var val = licMatchBackup[1].trim();
+        if (val.toUpperCase() !== "NOMBOR" && val.toUpperCase() !== "NEW" && val.toUpperCase() !== "BARU") {
             pilotLicense = "Licence No: " + val;
         }
     }
@@ -265,6 +328,7 @@ function parseAndBuildDashboard(html, THRESHOLD) {
         listContainer.appendChild(row);
     }
 
+    // Update Big Display Banner
     var banner = document.getElementById('dash-banner');
     if (hasExpired) {
         banner.innerText = "🔴 DO NOT FLY!";
