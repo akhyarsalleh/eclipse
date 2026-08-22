@@ -195,8 +195,8 @@
 
 <script>
     // Configuration Variables
-    //const PROXY_URL = "https://your-vercel-proxy-app.vercel.app/api/proxy"; // <-- Replace with your Vercel Proxy URL
-    const PROXY_URL = "https://eclipse-proxy-five.vercel.app/api/proxy"; // <-- Replace with your Vercel Proxy URL
+    // Linked with your live Vercel project domain:
+    const PROXY_URL = "https://eclipse-proxy-five.vercel.app/api/proxy"; 
     const THRESHOLD = 30; // 30-day warning trigger limit
     
     const html5QrCode = new Html5Qrcode("reader");
@@ -235,9 +235,7 @@
                     }
                 });
             }
-        ).then(() => {
-            statusDiv.innerText = "Status: Point at license badge QR code.";
-        }).catch(err => {
+        ).catch(err => {
             statusDiv.style.color = "var(--status-red)";
             statusDiv.innerText = "Camera Error: Please grant camera access permissions.";
         });
@@ -256,7 +254,7 @@
                 parseAndBuildDashboard(html);
             })
             .catch(err => {
-                alert("Network Connection Error: Unable to fetch live license details. (" + err.message + ")");
+                alert("Network Connection Error: " + err.message);
                 resetToScanner();
             });
     }
@@ -296,7 +294,7 @@
             return cells;
         }
 
-        // Helper: Translate Date Formats
+        // Helper: Translate Date Formats (100% Corrected Regex Array References)
         function parseLicenseDate(dateStr) {
             if (!dateStr) return null;
             var trimmed = dateStr.trim();
@@ -305,9 +303,9 @@
             var match = trimmed.match(/^(\d{1,2})\s+([a-zA-Z]{3,10})\s+(\d{4})$/);
             if (!match) return null;
             
-            var day = parseInt(match[1], 10);
-            var monthStr = match[2].toUpperCase();
-            var year = parseInt(match[3], 10);
+            var day = parseInt(match[2], 10);
+            var monthStr = match[3].toUpperCase(); 
+            var year = parseInt(match[4], 10);     
             
             var months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
             var monthsMalay = ["JAN", "FEB", "MAC", "APR", "MEI", "JUN", "JUL", "OGOS", "SEP", "OKT", "NOV", "DIS"];
@@ -370,13 +368,18 @@
         
         // Extract Personal Profile Details
         var bodyText = doc.body.textContent;
-        var nameMatch = bodyText.match(/Full Name of Holder\s*\(Nama Penuh Pemegang\)\s*\n*([A-Za-z\s]+)/i) || 
-                        bodyText.match(/Full Name of Holder\s*\n*([A-Za-z\s]+)/i);
-        if (nameMatch) pilotName = nameMatch[1].trim();
+        var nameMatch = bodyText.match(/Full Name of Holder\s*\(Nama Penuh Pemegang\)\s*\n*([A-Za-z\s\.]+)/i) || 
+                        bodyText.match(/Full Name of Holder\s*\n*([A-Za-z\s\.]+)/i);
+        if (nameMatch && nameMatch[2]) {
+            pilotName = nameMatch[2].trim();
+        }
 
         var licMatch = bodyText.match(/Licence No\s*Nombor Lesen Baru\s*(\w+)/i) || 
-                       bodyText.match(/LICENCE NO\s*(\w+)/i);
-        if (licMatch) pilotLicense = "Licence No: " + licMatch[1].trim();
+                       bodyText.match(/LICENCE NO\s*(\w+)/i) ||
+                       bodyText.match(/LICENCE NO\s*:\s*(\w+)/i);
+        if (licMatch && licMatch[2]) {
+            pilotLicense = "Licence No: " + licMatch[2].trim();
+        }
 
         // Extract Qualifications
         var qualificationData = {};
@@ -390,7 +393,7 @@
             
             if (cardText.indexOf('MEDICAL EXPIRY DATE') !== -1 || cardText.indexOf('LICENCE TYPE') !== -1) return;
             var cardNormalized = cardText.replace(/\s+/g, '');
-            if (cardNormalized.indexOf('CLASS1(SC)') !== -1) return; // Ignore Class 1(SC)
+            if (cardNormalized.indexOf('CLASS1(SC)') !== -1) return;
 
             var titleEl = card.querySelector('.col-sm-12 .bg-gray-300') || card.querySelector('div[style*="font-weight: 500"]') || card.querySelector('.fs-5');
             var labelText = titleEl ? titleEl.textContent.trim() : "";
@@ -464,7 +467,6 @@
         document.getElementById('dash-license').innerText = pilotLicense;
 
         var listContainer = document.getElementById('dash-list');
-        var overallStatus = "GREEN";
         var hasExpired = false;
         var hasWarning = false;
 
