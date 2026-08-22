@@ -68,6 +68,7 @@
             text-align: center;
             color: var(--text-muted);
             word-break: break-all;
+            margin-bottom: 10px;
         }
 
         /* Loading View Styles */
@@ -146,6 +147,7 @@
             font-weight: 700;
             cursor: pointer;
             transition: opacity 0.2s;
+            outline: none;
         }
         button.btn-primary:active { opacity: 0.8; }
     </style>
@@ -158,7 +160,8 @@
         <h1>License Scanner</h1>
         <p>Align the CAAM Digital License QR code within the framing boundaries.</p>
         <div id="reader"></div>
-        <div id="scanner-status" class="status-badge">Initializing back camera...</div>
+        <div id="scanner-status" class="status-badge">Ready to scan. Click below to start camera.</div>
+        <button id="btn-camera-trigger" class="btn-primary" onclick="startScanner()">⚡ Start Camera</button>
     </div>
 
     <!-- View 2: Loading State -->
@@ -170,22 +173,109 @@
 
     <!-- View 3: Safety Dashboard -->
     <div id="view-dashboard" class="view-step">
-        ...
+        <div class="pilot-header">
+            <div id="dash-name" class="pilot-name">-</div>
+            <div id="dash-license" class="pilot-meta">-</div>
+        </div>
+
+        <div id="dash-banner" class="status-banner">CHECKING STATUS...</div>
+
+        <div class="ratings-card">
+            <div class="ratings-title">Qualifications List</div>
+            <div id="dash-list">
+                <!-- Programmatically populated lists of ratings -->
+            </div>
+        </div>
+
+        <div class="disclaimer-box">
+            <b>REMINDER : ALWAYS RE-CHECK AND VERIFY!</b><br>
+            Crew cross-checking is still required for flight dispatch operations.
+        </div>
+
+        <button class="btn-primary" onclick="resetToScanner()">Scan Another License</button>
     </div>
 </div>
 
-<!-- LINK YOUR EXTERNAL PARSER ENGINE HERE -->
-<script src="https://raw.githubusercontent.com/akhyarsalleh/eclipse/main/app-parser.js"></script>
+<!-- 📦 LINK THE EXTERNAL PARSER ENGINE -->
+<!-- This uses a relative path to instantly run your GitHub-hosted app-parser.js! -->
+<script src="app-parser.js"></script>
 
 <script>
     // Configuration Variables
     const PROXY_URL = "https://eclipse-proxy-five.vercel.app/api/proxy"; 
-    const THRESHOLD = 30;
+    const THRESHOLD = 30; // 30-day warning trigger limit
     
-    const html5QrCode = new Html5Qrcode("reader");
-    ...
-    
-    // Fetch CAAM HTML via Serverless CORS Proxy
+    let html5QrCode = null;
+
+    // --- Switch UI States ---
+    function showView(viewId) {
+        document.querySelectorAll('.view-step').forEach(v => v.classList.remove('view-active'));
+        document.getElementById(viewId).classList.add('view-active');
+    }
+
+    function resetToScanner() {
+        document.getElementById('dash-list').innerHTML = '';
+        showView('view-scanner');
+        document.getElementById('btn-camera-trigger').style.display = "block";
+        document.getElementById('scanner-status').innerText = "Ready to scan. Click below to start camera.";
+    }
+
+    // --- Start Camera (Gesture Triggered) ---
+    function startScanner() {
+        const statusDiv = document.getElementById('scanner-status');
+        const triggerBtn = document.getElementById('btn-camera-trigger');
+        
+        statusDiv.style.color = "var(--text-muted)";
+        statusDiv.innerText = "Status: Booting rear optics...";
+        triggerBtn.style.display = "none";
+
+        if (!html5QrCode) {
+            try {
+                html5QrCode = new Html5Qrcode("reader");
+            } catch (e) {
+                statusDiv.style.color = "var(--status-red)";
+                statusDiv.innerText = "Library Error: Failed to link video element.";
+                triggerBtn.style.display = "block";
+                return;
+            }
+        }
+
+        const qrboxFunction = function(viewfinderWidth, viewfinderHeight) {
+            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+            return {
+                width: Math.floor(minEdge * 0.7),
+                height: Math.floor(minEdge * 0.7)
+            };
+        };
+
+        const qrConfig = { fps: 15, qrbox: qrboxFunction };
+
+        html5QrCode.start(
+            { facingMode: "environment" }, 
+            qrConfig, 
+            (decodedText) => {
+                html5QrCode.stop().then(() => {
+                    if (decodedText.indexOf("eclipse.caam.gov.my") !== -1) {
+                        showView('view-loading');
+                        fetchLicenseData(decodedText);
+                    } else {
+                        alert("Invalid QR: Must be an official CAAM Digital License QR.");
+                        resetToScanner();
+                    }
+                }).catch(err => {
+                    resetToScanner();
+                });
+            }
+        ).then(() => {
+            statusDiv.innerText = "Status: Scan the license badge QR code.";
+        }).catch(err => {
+            statusDiv.style.color = "var(--status-red)";
+            statusDiv.innerText = "Camera Access Error: Please grant camera permissions.";
+            triggerBtn.style.display = "block";
+        });
+    }
+
+    // --- Fetch CAAM HTML via Serverless CORS Proxy ---
     function fetchLicenseData(caamUrl) {
         const fetchUrl = PROXY_URL + "?url=" + encodeURIComponent(caamUrl) + "&_t=" + Date.now();
         
@@ -195,7 +285,7 @@
                 return res.text();
             })
             .then(html => {
-                // Call the function defined in your linked app-parser.js!
+                // Execute parsing engine imported from app-parser.js!
                 parseAndBuildDashboard(html, THRESHOLD);
             })
             .catch(err => {
