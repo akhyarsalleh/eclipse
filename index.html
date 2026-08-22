@@ -240,16 +240,11 @@
             }
         }
 
-        const qrboxFunction = function(viewfinderWidth, viewfinderHeight) {
-            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-            return {
-                width: Math.floor(minEdge * 0.7),
-                height: Math.floor(minEdge * 0.7)
-            };
+        // 🎯 FIXED SQUARE VIEWPORT (IMMUNE TO SAFARI RENDERING LAGS)
+        const qrConfig = { 
+            fps: 15, 
+            qrbox: { width: 250, height: 250 } 
         };
-
-        //const qrConfig = { fps: 15, qrbox: qrboxFunction };
-        const qrConfig = { fps: 15, qrbox: { width: 250, height: 250 }  };
 
         html5QrCode.start(
             { facingMode: "environment" }, 
@@ -266,6 +261,9 @@
                 }).catch(err => {
                     resetToScanner();
                 });
+            },
+            (errorMessage) => {
+                // Suppressed frame-level search errors
             }
         ).then(() => {
             statusDiv.innerText = "Status: Scan the license badge QR code.";
