@@ -54,9 +54,9 @@ function parseAndBuildDashboard(html, THRESHOLD) {
         var match = trimmed.match(/^(\d{1,2})\s+([a-zA-Z]{3,10})\s+(\d{4})$/);
         if (!match) return null;
         
-        var day = parseInt(match[4], 10);
-        var monthStr = match[5].toUpperCase(); 
-        var year = parseInt(match[6], 10);     
+        var day = parseInt(match[3], 10);
+        var monthStr = match[4] ? match[4].toUpperCase() : ""; 
+        var year = parseInt(match[5], 10);     
         
         var months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
         var monthsMalay = ["JAN", "FEB", "MAC", "APR", "MEI", "JUN", "JUL", "OGOS", "SEP", "OKT", "NOV", "DIS"];
@@ -157,17 +157,17 @@ function parseAndBuildDashboard(html, THRESHOLD) {
 
     // 3. Resilient Name Extraction (100% accurate, ignores markup/table structures)
     var nameMatch = bodyText.match(/Full Name of Holder\s*(?:\([^)]*\)\s*)*[^A-Za-z]*\s*([A-Za-z\s\.\'\-]+?)\s*[^A-Za-z]*\s*(?:\s+(?:IVc|Date of Birth|Tarikh Lahir|Address|Alamat|Nationality|MALAYSIAN)|$)/i);
-    if (nameMatch && nameMatch[4]) {
-        pilotName = nameMatch[4].trim();
+    if (nameMatch && nameMatch[3]) {
+        pilotName = nameMatch[3].trim();
         // Trim standard trailing noise
         pilotName = pilotName.replace(/^[|\|\s\-\.\'\#\:\*]+/, '').replace(/[|\|\s\-\.\'\#\:\*]+$/, '').trim();
     }
 
     // 4. Resilient License Number Extraction (Dual-Pass Lookahead Matching)
     // Pass A: Query Section III directly
-    var section3Match = bodyText.match(/III\s*\|?\s*LICENCE\s*NO\.?\s*([^(\||\\(]+?)(?:\s*\(|\s*\||\s*$)/i);
-    if (section3Match && section3Match[4]) {
-        var val = section3Match[4].trim();
+    var section3Match = bodyText.match(/III\s*\|?\s*LICENCE\s*NO\.?\s*([^(\|\s]+)/i);
+    if (section3Match && section3Match[3]) {
+        var val = section3Match[3].trim();
         val = val.replace(/^[|\|\s\-\.\'\#\:\*]+/, '').replace(/[|\|\s\-\.\'\#\:\*]+$/, '').trim();
         if (val && val.length > 2 && val.toUpperCase() !== "NOMBOR" && val.toUpperCase() !== "NEW" && val.toUpperCase() !== "BARU") {
             pilotLicense = "Licence No: " + val;
@@ -177,8 +177,8 @@ function parseAndBuildDashboard(html, THRESHOLD) {
     // Pass B: Lookahead search against top banner (Fallback)
     if (pilotLicense === "License No: -") {
         var licMatch = bodyText.match(/Licence\s*No[^\w]*Nombor\s*Lesen\s*(?:Baru|Lama)?\s*[^\w]*([A-Z0-9\/\s\-]+?)(?=\s+Old|\s+Nombor|\s+Licence|\s*[*]+|$)/i);
-        if (licMatch && licMatch[4]) {
-            var val = licMatch[4].trim();
+        if (licMatch && licMatch[3]) {
+            var val = licMatch[3].trim();
             val = val.replace(/^[|\|\s\-\.\'\#\:\*]+/, '').replace(/[|\|\s\-\.\'\#\:\*]+$/, '').trim();
             if (val && val.length > 2 && val.toUpperCase() !== "NOMBOR" && val.toUpperCase() !== "NEW" && val.toUpperCase() !== "BARU") {
                 pilotLicense = "Licence No: " + val;
@@ -288,7 +288,7 @@ function parseAndBuildDashboard(html, THRESHOLD) {
 
         if (qualificationData[key] && qualificationData[key].status === "EXPIRED") return;
 
-        qualificationData[key] = { name, dateText, daysRemaining, status };
+        qualificationData[key] = { name: name, dateText: dateText, daysRemaining: daysRemaining, status: status };
     }
 
     // --- Render UI Elements ---
