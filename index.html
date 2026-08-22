@@ -249,7 +249,7 @@
         };
 
         //const qrConfig = { fps: 15, qrbox: qrboxFunction };
-        const qrConfig = { fps: 15, qrbox: qrboxFunction };
+        const qrConfig = { fps: 15, qrbox: { width: 250, height: 250 }  };
 
         html5QrCode.start(
             { facingMode: "environment" }, 
